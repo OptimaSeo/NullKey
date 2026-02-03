@@ -1,6 +1,7 @@
-// Entry point for NullKey frontend application
-import { initializeApp } from './ui/app';
+// Entry point for frontend application
+import { createRoot } from 'react-dom/client';
+import App from './App';
 
-document.addEventListener('DOMContentLoaded', () => {
-    initializeApp();
-});
+const container = document.getElementById('root');
+const root = createRoot(container!);
+root.render(<App />);
