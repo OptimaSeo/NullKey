@@ -58,4 +58,4 @@ Pastikan untuk menguji perubahan Anda secara menyeluruh sebelum mengirimkan pull
 
 Proyek ini saat ini mengimplementasikan fitur-fitur MVP yang didefinisikan dalam `mvp.md`. Harap pastikan kontribusi Anda selaras dengan cakupan saat ini dan jangan menambahkan fitur di luar persyaratan MVP yang ditentukan kecuali secara eksplisit dibahas dalam sebuah isu terlebih dahulu.
 
-Dengan berkontribusi, Anda setuju bahwa kode Anda dilisensikan di bawah AGPL‑3.0.
+Dengan berkontribusi, Anda setuju bahwa kode Anda dilisensikan di bawah AGPL‑3.0 dan hak cipta menjadi milik OptimaSeo.

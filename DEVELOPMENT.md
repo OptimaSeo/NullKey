@@ -74,10 +74,10 @@ Kemudian ubah nilai-nilai sesuai kebutuhan.
 ## Gambaran Arsitektur
 
 ### Frontend (Next.js)
-- Halaman-halaman di `src/pages/`
+- Halaman-halaman di `app/` (App Router)
 - Fungsi kripto di `src/crypto/`
 - Klien WebSocket di `src/socket/`
-- Komponen UI di `src/ui/`
+- Komponen UI di `components/`
 
 ### Backend (Node.js + WebSocket)
 - Server utama di `src/server.ts`

@@ -6,7 +6,7 @@ NullKey adalah aplikasi chat anonim dengan enkripsi end-to-end yang dirancang de
 ## Komponen
 
 ### Klien (Frontend)
-- **Framework**: Next.js (Rendering Sisi Klien untuk MVP)
+- **Framework**: Next.js (App Router dengan Rendering Sisi Klien untuk MVP)
 - **Perpustakaan Kripto**: WebCrypto API, implementasi @stablelib
 - **Penyimpanan**: IndexedDB untuk penyimpanan kunci lokal
 - **Komunikasi**: Koneksi WebSocket ke backend

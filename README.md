@@ -105,4 +105,18 @@ Kontribusi sangat dipersilakan. Silakan buat issue atau pull request untuk perba
 
 ## Lisensi
 
-Lisensi terlampir dalam file LICENSE.
+NullKey dilisensikan di bawah GNU Affero General Public License v3 (AGPL-3.0).
+
+Anda bebas menggunakan, memodifikasi, dan menjalankan perangkat lunak ini.
+
+Namun:
+- Jika Anda memodifikasi kode atau menggunakannya sebagai layanan jaringan (SaaS),
+  Anda harus menerbitkan kode sumber lengkap dari versi Anda.
+- Penggunaan komersial tanpa merilis kode sumber TIDAK diperbolehkan.
+
+Untuk lisensi komersial atau penggunaan closed-source,
+silakan hubungi: <nullkey@optimaseo.id>
+
+## Hak Cipta
+
+Hak cipta © 2026 OptimaSeo. Seluruh hak dilindungi.

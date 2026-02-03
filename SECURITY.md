@@ -42,6 +42,12 @@ Jika Anda menemukan kerentanan keamanan dalam NullKey, silakan laporkan secara b
 - Berikan waktu bagi kami untuk menanggapi dan memperbaiki masalah sebelum mengungkapkan publik
 - Jangan mengeksploitasi kerentanan yang ditemukan
 
+## Lisensi dan Hak Cipta
+
+NullKey dilisensikan di bawah GNU Affero General Public License v3 (AGPL-3.0).
+Hak cipta © 2026 OptimaSeo. Seluruh hak dilindungi.
+Untuk lisensi komersial, silakan hubungi: <nullkey@optimaseo.id>
+
 ## Batasan Keamanan
 
 Meskipun kami berusaha keras untuk menjaga keamanan, perlu dicatat bahwa NullKey memiliki beberapa batasan:

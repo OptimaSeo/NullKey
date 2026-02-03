@@ -7,7 +7,7 @@ const nextConfig = {
     unoptimized: true
   },
   experimental: {
-    appDir: false // Gunakan pages router, bukan app router
+    appDir: true // Gunakan app router
   }
 }
 
