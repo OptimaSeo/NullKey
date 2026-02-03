@@ -10,7 +10,7 @@
 
 1. Clone repositori:
    ```bash
-   git clone https://github.com/your-username/NullKey.git
+   git clone https://github.com/OptimaSeo/NullKey.git
    cd NullKey
    ```
 

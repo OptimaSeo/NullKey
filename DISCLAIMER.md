@@ -1,10 +1,10 @@
-# Disclaimer
+# Penyangkalan
 
-NullKey is an experimental privacy‑focused communication tool.
+NullKey adalah alat komunikasi berfokus privasi eksperimental.
 
-- This software does NOT guarantee perfect anonymity.
-- It does NOT protect against compromised client devices.
-- It does NOT protect against advanced traffic correlation attacks.
+- Perangkat lunak ini TIDAK menjamin anonimitas sempurna.
+- Perangkat ini TIDAK melindungi terhadap perangkat klien yang dikompromikan.
+- Perangkat ini TIDAK melindungi terhadap serangan korelasi lalu lintas tingkat lanjut.
 
-This project does not encourage or endorse illegal activity.
-Use at your own risk.
+Proyek ini tidak mendorong atau mendukung aktivitas ilegal.
+Gunakan dengan risiko sendiri.

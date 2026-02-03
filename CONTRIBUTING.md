@@ -1,61 +1,61 @@
-# Contributing to NullKey
+# Berkontribusi pada NullKey
 
-Thank you for your interest in contributing to NullKey! This document outlines the guidelines for contributing to this privacy-focused anonymous chat application.
+Terima kasih atas minat Anda untuk berkontribusi pada NullKey! Dokumen ini menjelaskan pedoman untuk berkontribusi pada aplikasi obrolan anonim yang berfokus pada privasi ini.
 
-## Security-First Philosophy
+## Filosofi Keamanan Terlebih Dahulu
 
-NullKey prioritizes user privacy and security above all else. When contributing:
+NullKey mengutamakan privasi dan keamanan pengguna di atas segalanya. Saat berkontribusi:
 
-- Never add features that compromise user anonymity
-- Follow the threat model outlined in `docs/threat-model.md`
-- Ensure no plaintext data is stored on the server
-- Maintain minimal metadata exposure
-- Follow the cryptographic design in `docs/crypto-design.md`
+- Jangan pernah menambahkan fitur yang membahayakan anonimitas pengguna
+- Ikuti model ancaman yang diuraikan dalam `docs/threat-model.md`
+- Pastikan tidak ada data plaintext yang disimpan di server
+- Jaga paparan metadata seminimal mungkin
+- Ikuti desain kriptografi dalam `docs/crypto-design.md`
 
-## Rules
+## Aturan
 
-- No feature requests that weaken privacy
-- No telemetry, tracking, or analytics
-- No user identification features
-- No persistent account systems
-- No plaintext data storage on server
-- Follow the MVP specification in `mvp.md`
+- Tidak ada permintaan fitur yang melemahkan privasi
+- Tidak ada telemetry, pelacakan, atau analitik
+- Tidak ada fitur identifikasi pengguna
+- Tidak ada sistem akun persisten
+- Tidak ada penyimpanan data plaintext di server
+- Ikuti spesifikasi MVP dalam `mvp.md`
 
-## Development Setup
+## Setup Pengembangan
 
-1. Fork the repository
-2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/NullKey.git`
-3. Navigate to project directory: `cd NullKey`
-4. Install dependencies:
+1. Fork repositori
+2. Clone hasil fork Anda: `git clone https://github.com/OptimaSeo/NullKey.git`
+3. Navigasi ke direktori proyek: `cd NullKey`
+4. Install dependensi:
    - Backend: `cd backend && npm install`
    - Frontend: `cd frontend && npm install`
 
-## Code Style
+## Gaya Kode
 
-- Follow the existing code style in the project
-- Use consistent formatting and meaningful variable names
-- Maintain the separation between client-side crypto and server-side relay
-- Document any security-relevant decisions
+- Ikuti gaya kode yang sudah ada dalam proyek
+- Gunakan format yang konsisten dan nama variabel yang bermakna
+- Jaga pemisahan antara kripto sisi klien dan relay sisi server
+- Dokumentasikan keputusan yang relevan dengan keamanan
 
-## Testing
+## Pengujian
 
-Make sure to test your changes thoroughly before submitting a pull request. Pay special attention to:
-- End-to-end encryption functionality
-- Message delivery and receipt
-- Room creation and joining
-- Security boundaries between server and client
+Pastikan untuk menguji perubahan Anda secara menyeluruh sebelum mengirimkan pull request. Perhatikan khususnya:
+- Fungsi enkripsi end-to-end
+- Pengiriman dan penerimaan pesan
+- Pembuatan dan bergabung ruangan
+- Batas keamanan antara server dan klien
 
-## Pull Requests
+## Pull Request
 
-- One feature per PR
-- Clear explanation required
-- Security impact must be documented
-- Follow the architecture described in `docs/architecture.md`
-- Reference the relevant sections of the MVP specification if applicable
-- Ensure no plaintext data is exposed to the server
+- Satu fitur per PR
+- Penjelasan yang jelas diperlukan
+- Dampak keamanan harus didokumentasikan
+- Ikuti arsitektur yang dijelaskan dalam `docs/architecture.md`
+- Referensikan bagian-bagian relevan dari spesifikasi MVP jika diperlukan
+- Pastikan tidak ada data plaintext yang terekspos ke server
 
-## MVP Scope
+## Cakupan MVP
 
-This project currently implements the MVP features defined in `mvp.md`. Please ensure your contributions align with the current scope and do not add features outside of the defined MVP requirements unless explicitly discussed in an issue first.
+Proyek ini saat ini mengimplementasikan fitur-fitur MVP yang didefinisikan dalam `mvp.md`. Harap pastikan kontribusi Anda selaras dengan cakupan saat ini dan jangan menambahkan fitur di luar persyaratan MVP yang ditentukan kecuali secara eksplisit dibahas dalam sebuah isu terlebih dahulu.
 
-By contributing, you agree your code is licensed under AGPL‑3.0.
+Dengan berkontribusi, Anda setuju bahwa kode Anda dilisensikan di bawah AGPL‑3.0.
