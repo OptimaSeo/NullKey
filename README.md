@@ -121,6 +121,7 @@ See [`.env.example`](.env.example) for the full list.
 │   ├── Dockerfile         Next.js → nginx:stable-alpine
 │   └── jest.config.js     Jest configuration
 │
+├── docker-compose.yml     Deploy both services with one command
 ├── .env.example           All configurable environment variables
 ├── SECURITY.md            Vulnerability disclosure policy
 ├── CONTRIBUTING.md        Developer setup & PR guide
@@ -130,6 +131,24 @@ See [`.env.example`](.env.example) for the full list.
 ---
 
 ## Docker
+
+### Docker Compose (recommended)
+
+```bash
+docker compose up -d
+# Frontend: http://localhost:3000
+# Backend:  http://localhost:8080
+```
+
+Custom domain:
+
+```bash
+ALLOWED_ORIGINS=https://chat.domain.com \
+  NEXT_PUBLIC_WS_URL=wss://relay.domain.com \
+  docker compose up -d
+```
+
+### Individual images
 
 ```bash
 # Backend
