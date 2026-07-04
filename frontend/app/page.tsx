@@ -125,7 +125,7 @@ function FileMessage({ msg, onDownload }: { msg: ChatMessage; onDownload: (m: Ch
 }
 
 export default function HomePage() {
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState('Anonymous');
   const [usernameInput, setUsernameInput] = useState('');
   const [roomSecretInput, setRoomSecretInput] = useState('');
   const [fingerprint, setFingerprint] = useState('');
@@ -252,16 +252,16 @@ export default function HomePage() {
           if (payload?.fingerprint) {
             setPeers((prev) => {
               if (prev.some((p) => p.fingerprint === payload.fingerprint)) return prev;
-              return [...prev, { fingerprint: payload.fingerprint, username: payload.username || 'anon' }];
+              return [...prev, { fingerprint: payload.fingerprint, username: payload.username || 'Anonymous' }];
             });
-            addSystemMessage(`${payload.username || 'anon'} joined the room`);
+            addSystemMessage(`${payload.username || 'Anonymous'} joined the room`);
           }
           break;
         }
         case 'client:left': {
           if (payload?.fingerprint) {
             setPeers((prev) => prev.filter((p) => p.fingerprint !== payload.fingerprint));
-            addSystemMessage(`${payload.username || 'anon'} left the room`);
+            addSystemMessage(`${payload.username || 'Anonymous'} left the room`);
           }
           break;
         }
@@ -346,12 +346,12 @@ export default function HomePage() {
     async (roomId: string) => {
       const sm = sessionManagerRef.current;
       const ws = wsClientRef.current;
-      if (!sm || !ws || !username) return;
+      if (!sm || !ws) return;
       ws.sendKeyExchange({
         room_id: roomId,
         sender_fingerprint: sm.fingerprint,
         sender_public_key: publicKeyBase64(),
-        sender_username: username,
+        sender_username: username || 'Anonymous',
       });
     },
     [publicKeyBase64, username],
@@ -379,9 +379,9 @@ export default function HomePage() {
         sm.establishSharedSecret(bytes, payload.sender_fingerprint);
         setPeers((prev) => {
           if (prev.some((p) => p.fingerprint === payload.sender_fingerprint)) return prev;
-          return [...prev, { fingerprint: payload.sender_fingerprint, username: payload.sender_username || 'anon' }];
+          return [...prev, { fingerprint: payload.sender_fingerprint, username: payload.sender_username || 'Anonymous' }];
         });
-        addSystemMessage(`Secure session established with ${payload.sender_username || 'anon'}`);
+        addSystemMessage(`Secure session established with ${payload.sender_username || 'Anonymous'}`);
       } catch (err) {
         console.error('Failed to establish shared secret:', err);
       }
@@ -398,7 +398,7 @@ export default function HomePage() {
 
       const sharedSecret = sm.getSharedSecret(payload.sender_fingerprint);
       if (!sharedSecret) {
-        addSystemMessage(`Received message from ${payload.sender_username || 'anon'} but no shared secret is established yet`);
+        addSystemMessage(`Received message from ${payload.sender_username || 'Anonymous'} but no shared secret is established yet`);
         return;
       }
 
@@ -411,7 +411,7 @@ export default function HomePage() {
           {
             id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             fingerprint: payload.sender_fingerprint,
-            username: payload.sender_username || 'anon',
+            username: payload.sender_username || 'Anonymous',
             plaintext: JSON.stringify({
               ciphertext: payload.ciphertext,
               nonce: payload.nonce,
@@ -435,7 +435,7 @@ export default function HomePage() {
                 {
                   id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                   fingerprint: payload.sender_fingerprint,
-                  username: payload.sender_username || 'anon',
+                  username: payload.sender_username || 'Anonymous',
                   plaintext: text,
                   timestamp: payload.timestamp || Date.now(),
                   mine: false,
@@ -444,7 +444,7 @@ export default function HomePage() {
             })
             .catch((err) => {
               console.error('Decryption failed:', err);
-              addSystemMessage(`Failed to decrypt message from ${payload.sender_username || 'anon'}`);
+              addSystemMessage(`Failed to decrypt message from ${payload.sender_username || 'Anonymous'}`);
             });
         } catch (err) {
           console.error('Decryption error:', err);
@@ -457,12 +457,6 @@ export default function HomePage() {
   // ── room actions ──
 
   const handleCreateRoom = async () => {
-    if (!sessionManagerRef.current || !wsClientRef.current) return;
-    if (!username) {
-      setStatus('Please choose a username first');
-      return;
-    }
-
     const sm = sessionManagerRef.current;
     const roomSecret = SessionManager.generateRoomSecret();
     const roomId = await SessionManager.getRoomId(roomSecret);
@@ -497,10 +491,6 @@ export default function HomePage() {
 
   const handleJoinRoom = async (secret?: string, token?: string) => {
     if (!sessionManagerRef.current || !wsClientRef.current) return;
-    if (!username) {
-      setStatus('Please choose a username first');
-      return;
-    }
 
     let roomSecret = secret;
     let inviteToken = token;
@@ -846,7 +836,7 @@ export default function HomePage() {
           {/* Peserta & status */}
           <div className="flex flex-wrap gap-4 justify-between items-center mb-4 text-xs">
             <div className="text-gray-500">
-              You:<span className="text-neon-green ml-2">{username || 'anon'}</span>
+              You:<span className="text-neon-green ml-2">{username || 'Anonymous'}</span>
               <span className="text-gray-600 mx-2">·</span>
               <span className="text-gray-500">key: {fingerprint.substring(0, 16)}&hellip;</span>
             </div>
@@ -1030,16 +1020,16 @@ export default function HomePage() {
           {/* Username */}
           <div>
             <label className="block text-xs text-gray-500 mb-2 tracking-widest uppercase">
-              Choose a handle (optional)
+              Your display name (leave blank = Anonymous)
             </label>
             <input
               type="text"
               value={usernameInput}
               onChange={(e) => {
                 setUsernameInput(e.target.value);
-                setUsername(e.target.value.trim());
+                setUsername(e.target.value.trim() || 'Anonymous');
               }}
-              placeholder="anon"
+              placeholder="Anonymous"
               className="w-full px-4 py-2 bg-card-bg border border-dark-green text-neon-green focus:outline-none focus:border-neon-green text-center"
             />
           </div>
