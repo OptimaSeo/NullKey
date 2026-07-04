@@ -464,7 +464,9 @@ export default function HomePage() {
 
     try {
       await ensureConnected();
-      wsClientRef.current.createRoom(roomId, inviteToken);
+      const ws = wsClientRef.current;
+      if (!ws) { setStatus('Not connected'); return; }
+      ws.createRoom(roomId, inviteToken);
       setActiveRoomSecret(roomSecret);
       setActiveRoomId(roomId);
       setLatestRoomSecret(roomSecret);
@@ -545,7 +547,9 @@ export default function HomePage() {
     try {
       const roomId = await SessionManager.getRoomId(roomSecret);
       await ensureConnected();
-      wsClientRef.current.joinRoom(roomId, inviteToken);
+      const ws = wsClientRef.current;
+      if (!ws) { setStatus('Not connected'); return; }
+      ws.joinRoom(roomId, inviteToken);
       setActiveRoomSecret(roomSecret);
       setActiveRoomId(roomId);
       setMessages([
