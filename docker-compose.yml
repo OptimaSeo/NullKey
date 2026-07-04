@@ -3,7 +3,7 @@ services:
     build:
       context: ./backend
     ports:
-      - "8080:8080"
+      - "2020:8080"
     environment:
       - NODE_ENV=production
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
@@ -37,7 +37,7 @@ services:
       args:
         NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://backend:8080}
     ports:
-      - "3000:80"
+      - "1010:80"
     restart: unless-stopped
     depends_on:
       backend:
