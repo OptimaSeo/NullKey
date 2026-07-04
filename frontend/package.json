@@ -14,7 +14,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "@stablelib/x25519": "^1.0.3",
+    "@stablelib/x25519": "^2.0.1",
     "next": "14.0.0",
     "qrcode": "^1.5.4",
     "react": "18.2.0",
