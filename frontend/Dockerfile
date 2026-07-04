@@ -4,8 +4,6 @@
 # ── Stage 1: Build ──
 FROM node:20-alpine AS builder
 
-ARG NEXT_PUBLIC_WS_URL=ws://localhost:8080
-
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -16,6 +14,7 @@ COPY app/ app/
 COPY components/ components/
 COPY src/ src/
 
+# WebSocket URL is auto-detected from window.location at runtime (no build arg needed)
 RUN npm run build
 
 # ── Stage 2: Serve ──
@@ -42,6 +41,16 @@ server {
     location /_next/static/ {
         expires 1y;
         add_header Cache-Control "public, immutable";
+    }
+
+    location /ws {
+        proxy_pass http://backend:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 86400s;
     }
 
     location / {
