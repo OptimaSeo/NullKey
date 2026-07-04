@@ -24,7 +24,7 @@ export interface BaseMessage {
 
 export interface RoomActionPayload {
   room_id: string;
-  room_secret: string;
+  invite_token: string;
 }
 
 // Message validation functions

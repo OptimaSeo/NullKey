@@ -19,14 +19,22 @@ NullKey adalah aplikasi chat anonim dengan enkripsi end-to-end yang dirancang de
 
 ## Alur Data
 
-1. Klien menghasilkan pasangan kunci X25519 secara lokal
-2. Ruangan dibuat menggunakan akses berbasis rahasia (tidak disimpan di server)
-3. Pesan dienkripsi end-to-end (server tidak pernah melihat teks asli)
-4. Semua data bersifat sementara dengan pembersihan otomatis
+1. Klien menghasilkan pasangan kunci X25519 secara lokal (disimpan di IndexedDB)
+2. Ruangan dibuat dengan `room_secret` (salt HKDF) + `invite_token` (untuk server)
+3. Hanya `invite_token` yang dikirim ke server; `room_secret` tetap di klien
+4. Tautan undangan berisi `room_secret` + `invite_token` + sidik jari pengirim
+5. Pesan dienkripsi end-to-end (server tidak pernah melihat teks asli)
+6. Semua data bersifat sementara dengan pembersihan otomatis
 
 ## Model Keamanan
 
-- Server nol-pengetahuan (tidak dapat membaca pesan)
+- Server nol-pengetahuan (tidak dapat membaca pesan, tidak pernah melihat `room_secret`)
 - Tidak adanya sistem akun mengurangi permukaan serangan
-- Identitas kriptografi dihasilkan di sisi klien
+- Identitas kriptografi dihasilkan dan disimpan di sisi klien
+- Otentikasi kunci publik via sidik jari dalam tautan undangan (pencegahan MITM)
+- Pembatasan frekuensi per IP dan per sidik jari
+- Validasi asal koneksi WebSocket (perbandingan hostname)
+- Perlindungan pemutaran ulang (nonce tracking)
+- Header keamanan HTTP (CSP, X-Frame-Options, dll)
+- Klien abusive diputus setelah pelanggaran berulang
 - Kedaluwarsa otomatis ruangan dan pesan

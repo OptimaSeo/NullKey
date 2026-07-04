@@ -14,7 +14,7 @@ NullKey mengimplementasikan enkripsi end-to-end (E2EE) menggunakan primitif krip
 - **Algoritma**: AES-256-GCM (Standar Enkripsi Lanjutan dengan Mode Galois/Counter)
 - **Tujuan**: Mengenkripsi konten pesan
 - **Properti**: Enkripsi terotentikasi dengan data terkait (AEAD)
-- **Implementasi**: @stablelib/aes-gcm
+- **Implementasi**: WebCrypto API (crypto.subtle.encrypt/decrypt)
 
 ### Derivasi Kunci
 - **Algoritma**: HKDF (Fungsi Derivasi Kunci Ekstraksi-Ekspansi Berbasis HMAC)
@@ -36,14 +36,20 @@ NullKey mengimplementasikan enkripsi end-to-end (E2EE) menggunakan primitif krip
 ### Pembuatan Ruangan
 1. Klien menghasilkan rahasia ruangan acak 256-bit
 2. ID ruangan dihitung sebagai hash SHA-256 dari rahasia ruangan
-3. Hanya ID ruangan (bukan rahasia) yang dikirim ke server
-4. Tautan undangan berisi rahasia ruangan (untuk dibagikan di luar jalur)
+3. Klien juga menghasilkan token undangan satu kali yang acak
+4. Hanya ID ruangan + token undangan yang dikirim ke server (rahasia ruangan tidak pernah dikirim)
+5. Server menyimpan token undangan per ruangan untuk validasi join
+6. Tautan undangan berisi rahasia ruangan + token undangan + sidik jari pengirim (dibagikan di luar jalur)
 
 ### Proses Pertukaran Kunci
-1. Peer terhubung ke ruangan yang sama menggunakan rahasia ruangan
-2. Setiap peer menyiarkan kunci publik mereka ke ruangan melalui server
-3. Peer menghitung rahasia bersama menggunakan X25519 dengan kunci privat mereka dan kunci publik peer
-4. Rahasia bersama digunakan untuk menurunkan kunci sesi dengan HKDF
+1. Peer menerima tautan undangan yang berisi rahasia ruangan + token + sidik jari yang diharapkan
+2. Peer terhubung ke ruangan menggunakan token undangan (bukan rahasia ruangan)
+3. Setiap peer menyiarkan kunci publik mereka ke ruangan melalui server
+4. Peer menghitung rahasia bersama menggunakan X25519 dengan kunci privat mereka dan kunci publik peer
+5. Peer menerima notifikasi server: `key:exchange` berisi kunci publik + sidik jari peer lain
+6. Sidik jari yang diterima dari server dicocokkan dengan sidik jari dari tautan undangan
+7. Jika sidik jari tidak cocok, koneksi ditolak — ini adalah satu-satunya perlindungan terhadap MITM
+8. Rahasia bersama digunakan untuk menurunkan kunci sesi dengan HKDF
 
 ### Enkripsi Pesan
 1. Setiap pesan mendapatkan nonce acak unik (96 bit untuk AES-GCM)
@@ -57,15 +63,20 @@ NullKey mengimplementasikan enkripsi end-to-end (E2EE) menggunakan primitif krip
 
 ## Properti Keamanan
 
-### Forward Secrecy
-- Kunci sesi diturunkan dari rahasia bersama yang hanya diketahui oleh pihak yang berkomunikasi
-- Kompromi salah satu kunci sesi tidak mempengaruhi komunikasi masa lalu atau masa depan
+### Keterbatasan: Tidak Ada Forward Secrecy
+- Kunci sesi diturunkan langsung dari rahasia bersama X25519 menggunakan HKDF
+- Tidak ada mekanisme rotasi kunci atau ratchet (seperti Signal Protocol)
+- Jika kunci privat jangka panjang salah satu pihak disusupi, semua pesan masa lalu dapat didekripsi
+- Ini adalah batasan desain yang disadari — NullKey mengutamakan kesederhanaan dibanding FS
 
 ### Minimasi Metadata
-- Server tidak pernah melihat pesan teks asli
+- Server tidak pernah melihat pesan teks asli atau rahasia ruangan
+- Server hanya menyimpan ID ruangan, token undangan satu kali, dan keanggotaan sementara
 - Server tidak menyimpan identitas pengguna atau data historis
-- Hanya informasi keanggotaan ruangan sementara yang dipelihara
 
-### Otentikasi
-- Partisipan mengotentikasi satu sama lain melalui sidik jari kunci publik
+### Otentikasi dan Pencegahan MITM
+- Sidik jari kunci publik disematkan dalam tautan undangan bersama rahasia ruangan
+- Partisipan memverifikasi sidik jari peer setelah pertukaran kunci
+- Jika sidik jari tidak cocok, koneksi ditolak dan peringatan ditampilkan ke pengguna
+- Keamanan bergantung pada kerahasiaan jalur undangan (dibagikan di luar jalur)
 - Integritas pesan diverifikasi melalui tag otentikasi AES-GCM

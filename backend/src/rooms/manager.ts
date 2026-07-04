@@ -7,32 +7,34 @@
  * the Free Software Foundation, version 3.
  */
 
-import crypto from 'crypto';
 import { RoomModel } from './room';
 import { ClientConnection } from '../ws/handler';
 
 export class RoomManager {
   private rooms: Map<string, RoomModel>;
-  private secrets: Map<string, string>; // Maps secret to room ID
+  private inviteTokens: Map<string, Set<string>>; // roomId → Set<one-time token>
 
   constructor() {
     this.rooms = new Map();
-    this.secrets = new Map();
+    this.inviteTokens = new Map();
   }
 
   /**
-   * Add a new room
+   * Add a new room with an optional invite token
    * @param roomId The unique identifier for the room
-   * @param roomSecret The secret used to join the room
+   * @param inviteToken Optional one-time token for joining
    * @returns True if room was added successfully, false otherwise
    */
-  addRoom(roomId: string): boolean {
+  addRoom(roomId: string, inviteToken?: string): boolean {
     if (this.rooms.has(roomId)) {
       return false;
     }
 
     const room = new RoomModel(roomId);
     this.rooms.set(roomId, room);
+    if (inviteToken) {
+      this.inviteTokens.set(roomId, new Set([inviteToken]));
+    }
     return true;
   }
 
@@ -68,13 +70,7 @@ export class RoomManager {
     // If room is empty after removal, clean it up
     if (room.isEmpty()) {
       this.rooms.delete(roomId);
-      // Also remove the corresponding secret mapping
-      for (const [secret, id] of this.secrets.entries()) {
-        if (id === roomId) {
-          this.secrets.delete(secret);
-          break;
-        }
-      }
+      this.inviteTokens.delete(roomId);
     }
     
     return removed;
@@ -131,28 +127,47 @@ export class RoomManager {
   }
 
   /**
-   * Get room ID from secret
-   * @param roomSecret The secret used to create/join the room
-   * @returns Room ID if found, undefined otherwise
+   * Verify an invite token for a room
+   * @param roomId The room to verify against
+   * @param token The invite token to check
+   * @returns True if the token is valid for this room
    */
-  getRoomIdFromSecret(roomSecret: string): string | undefined {
-    return this.secrets.get(roomSecret);
+  verifyInviteToken(roomId: string, token: string): boolean {
+    const tokens = this.inviteTokens.get(roomId);
+    return tokens?.has(token) ?? false;
   }
 
   /**
-   * Register a secret for a room
-   * @param roomSecret The secret for the room
-   * @param roomId The ID of the room
+   * Invalidate (consume) a one-time invite token
+   * @param roomId The room the token belongs to
+   * @param token The token to invalidate
    */
-  registerRoomSecret(roomSecret: string, roomId: string): void {
-    this.secrets.set(roomSecret, roomId);
+  invalidateToken(roomId: string, token: string): void {
+    const tokens = this.inviteTokens.get(roomId);
+    if (tokens) {
+      tokens.delete(token);
+      if (tokens.size === 0) {
+        this.inviteTokens.delete(roomId);
+      }
+    }
+  }
+
+  /**
+   * Add an invite token to an existing room (for reconnect or additional invites)
+   * @param roomId The room to add the token to
+   * @param token The invite token to add
+   */
+  addInviteToken(roomId: string, token: string): void {
+    if (!this.inviteTokens.has(roomId)) {
+      this.inviteTokens.set(roomId, new Set());
+    }
+    this.inviteTokens.get(roomId)!.add(token);
   }
 
   /**
    * Clean up expired rooms
    */
   cleanupExpiredRooms(): void {
-    const now = Date.now();
     const expiredRooms: string[] = [];
 
     this.rooms.forEach((room, roomId) => {
@@ -163,13 +178,7 @@ export class RoomManager {
 
     expiredRooms.forEach(roomId => {
       this.rooms.delete(roomId);
-      // Also remove the corresponding secret mapping
-      for (const [secret, id] of this.secrets.entries()) {
-        if (id === roomId) {
-          this.secrets.delete(secret);
-          break;
-        }
-      }
+      this.inviteTokens.delete(roomId);
     });
   }
 

@@ -1,122 +1,174 @@
-# NullKey - Chat Terenkripsi End-to-End Anonim
+# NullKey — Disposable Encrypted Group Chat
 
-NullKey adalah aplikasi chat anonim dengan enkripsi end-to-end (E2EE) berbasis web. Aplikasi ini dirancang untuk menjaga privasi pengguna dengan meminimalkan metadata dan tidak menyimpan informasi identitas pengguna.
+**Browser-based, end-to-end encrypted group chat.** No accounts. No message history. One Docker to self-host.
 
-## Fitur Utama (MVP)
+## Overview
 
-- Chat 1-ke-1 dan grup kecil (maksimal 10 peserta per ruangan)
-- Tanpa email atau nomor HP
-- Enkripsi End-to-End (E2EE) menggunakan X25519 dan AES-256-GCM
-- Ruangan berbasis rahasia
-- Pesan otomatis terhapus (sementara)
-- Server tidak bisa membaca isi chat
-- Nama pengguna tanpa identifikasi untuk kejelasan percakapan
+```
+┌────────────┐     WebSocket (ciphertext only)     ┌────────────┐
+│  Browser A  │◄───────────────────────────────────►│  Browser B  │
+│  (X25519    │         relay                        │  (X25519    │
+│   + AES-    │         server                       │   + AES-    │
+│   256-GCM)  │         (blind)                      │   256-GCM)  │
+└────────────┘                                      └────────────┘
+```
 
-## Arsitektur
+All cryptography is client-side (WebCrypto API). The server **never** sees plaintext, encryption keys, or room secrets.
 
-### Klien (Browser)
-- Generate pasangan kunci secara lokal
-- Enkripsi & dekripsi sepenuhnya di klien
-- Tidak mengirim data identitas nyata
-- Nama pengguna hanya untuk UI, bukan identitas kriptografi
+- **X25519** key exchange → **HKDF** key derivation → **AES-256-GCM** encryption
+- Rooms identified by `SHA-256(room_secret)` — server cannot derive the secret
+- No user accounts, no database, no persistent identity
 
-### Server
-- Relay WebSocket
-- Tidak menyimpan plaintext
-- Antrian pesan berbasis TTL
-- Tanpa autentikasi tradisional
-- Tanpa akun dan basis data pengguna
+## Project Structure
 
-## Teknologi yang Digunakan
+```
+├── backend/          WebSocket relay server (Node.js, ws, Express)
+│   ├── src/
+│   │   ├── server.ts       Entry point, Express + WebSocket
+│   │   ├── config.ts       Central env-var configuration
+│   │   ├── rooms/          Room lifecycle (create, join, leave, TTL)
+│   │   ├── relay/          Message routing and forwarding
+│   │   ├── ws/             Event handler, validation, replay guard
+│   │   └── ttl/            Periodic room cleanup
+│   ├── Dockerfile          Multi-stage, node:20-alpine
+│   ├── eslint.config.mjs   ESLint flat config
+│   └── jest.config.js      Jest configuration
+│
+├── frontend/         Web client (Next.js static export)
+│   ├── app/               Next.js App Router pages
+│   ├── components/        React components (Header, FeaturePanel, MatrixBg)
+│   ├── src/
+│   │   ├── crypto/        X25519 keygen, AES-256-GCM, HKDF, session mgmt
+│   │   ├── socket/        WebSocket client with event listeners
+│   │   └── storage/       IndexedDB keypair persistence
+│   ├── Dockerfile         Next.js → nginx:stable-alpine
+│   └── .eslintrc.json     ESLint (extends Next.js + Prettier)
+│
+├── .github/
+│   ├── dependabot.yml     Auto-update npm dependencies
+│   └── ISSUE_TEMPLATE/    Bug report & feature request templates
+├── .editorconfig
+├── .gitignore
+├── .env.example           All configurable environment variables
+├── SECURITY.md            Vulnerability disclosure policy
+├── CONTRIBUTING.md        Developer setup & PR guide
+└── README.md              You are here
+```
 
-### Frontend
-- Next.js (CSR saja untuk MVP)
-- WebCrypto API
-- IndexedDB (penyimpanan kunci lokal)
+## Quick Start
 
-### Backend
-- Node.js
-- WebSocket (ws)
-- Redis (antrian pesan TTL)
+```bash
+# Backend
+cd backend
+npm install
+npm run dev          # http://localhost:8080
 
-### Kriptografi
-- X25519 (pertukaran kunci)
-- AES-256-GCM (enkripsi pesan)
-- HKDF (derivasi kunci)
+# Frontend (separate terminal)
+cd frontend
+npm install
+npm run dev          # http://localhost:3000
+```
 
-## Instalasi
+Open `http://localhost:3000` in two browser tabs. Create a room in one, copy the secret, join in the other.
 
-1. Clone repositori
-2. Install dependensi:
-   ```bash
-   cd backend
-   npm install
+## Features
 
-   cd ../frontend
-   npm install
-   ```
-3. Jalankan server:
-   ```bash
-   cd backend
-   npm run dev
-   ```
-4. Jalankan klien:
-   ```bash
-   cd frontend
-   npm run dev
-   ```
+| Feature | Details |
+|---|---|---|
+| **E2EE** | X25519 + HKDF + AES-256-GCM, all via WebCrypto |
+| **Key persistence** | Keypair survives page reload (IndexedDB) |
+| **Invite token protocol** | Server never sees `room_secret` — one-time tokens instead |
+| **MITM protection** | Peer fingerprint in invite link, verified after key exchange |
+| **File sharing** | Encrypted file transfer (max 100 MB) with server-side size validation |
+| **QR invites** | QR code for room invites, scannable from phone |
+| **Typing indicators** | `typing:start` / `typing:stop` relayed in real-time |
+| **Replay protection** | Nonce-based dedup with per-fingerprint window |
+| **Rate limiting** | Per-IP + per-fingerprint message limits |
+| **Origin validation** | WebSocket connections checked against `ALLOWED_ORIGINS` (URL hostname match) |
+| **Security headers** | CSP, X-Frame-Options, X-Content-Type-Options, etc. |
+| **Abusive client disconnect** | Auto-disconnect after repeated protocol violations |
+| **Auto-cleanup** | Idle rooms expired after `ROOM_IDLE_TIMEOUT_MINUTES` |
 
-## Cara Kerja
+## Security Model
 
-1. Pengguna membuka aplikasi dan memilih nama pengguna
-2. Klien mengenerate pasangan kunci X25519 secara lokal
-3. Untuk membuat ruangan:
-   - Klien generate room_secret (acak 256-bit)
-   - room_id = hash(room_secret)
-   - Hanya room_id dikirim ke server
-4. Untuk bergabung ruangan:
-   - Pengguna lain menggunakan room_secret yang dibagikan
-   - Server hanya mengetahui room_id, bukan room_secret
-5. Proses tangan E2EE:
-   - Klien saling bertukar kunci publik (melalui server)
-   - Mendapatkan rahasia bersama menggunakan X25519
-   - Mendapatkan kunci sesi menggunakan HKDF
-6. Semua pesan:
-   - Dienkripsi dengan AES-256-GCM
-   - Menggunakan nonce acak unik per pesan
+**Protected:**
+- Server compromise — ciphertext only, server has no decryption keys or `room_secret`
+- Database leak — no database, no persistence
+- Passive network monitoring — all content encrypted with AES-256-GCM
+- Man-in-the-middle during key exchange — prevented by fingerprint verification in invite link
+- Replay attacks — nonce dedup per sender fingerprint
+- Cross-site WebSocket hijacking — origin validation uses exact hostname matching
+- Abusive clients — rate limited per IP + per fingerprint, disconnected after repeated violations
 
-## Perlindungan & Batasan
+**Not protected:**
+- Compromised client device — once someone controls the browser, game over
+- ISP-level traffic correlation — no TOR, metadata like IP and packet timing visible
+- Forward secrecy — session key is static for the room lifetime; no ratcheting
+- Metadata — server sees IPs, connection timing, message sizes, and participant fingerprints
 
-### Dilindungi dari
-- Admin server yang penasaran
-- Kebocoran basis data
-- Pemantauan jaringan pasif
-- Pengguna anonim satu sama lain di luar ruangan
+**Known limitations:**
+- Forward secrecy: uses a single X25519 keypair per session, not Double Ratchet. Private key compromise exposes past messages.
+- Network anonymity: *anonymous identity, not anonymous network*
 
-### Tidak dilindungi dari
-- Perangkat klien yang dikompromikan
-- Korrelasi lalu lintas tingkat ISP
-- Rekayasa sosial
-- Perekaman layar / pengintaian meja
+## Configuration
 
-## Kontribusi
+Copy `.env.example` and adjust:
 
-Kontribusi sangat dipersilakan. Silakan buat issue atau pull request untuk perbaikan fitur atau keamanan.
+```bash
+cp .env.example .env
+# Edit .env to taste
+```
 
-## Lisensi
+Key variables:
+- `ALLOWED_ORIGINS` — comma-separated origins permitted to connect via WebSocket
+- `RATE_LIMIT_MAX_CONNECTIONS_PER_IP` — max concurrent connections per IP
+- `MAX_PARTICIPANTS_PER_ROOM` — max clients per room (default 10)
+- `REPLAY_PROTECTION_ENABLED` — enable/disable nonce replay check
 
-NullKey dilisensikan di bawah GNU Affero General Public License v3 (AGPL-3.0).
+## Docker
 
-Anda bebas menggunakan, memodifikasi, dan menjalankan perangkat lunak ini.
+```bash
+# Backend
+cd backend
+docker build -t nullkey-backend .
+docker run -d -p 8080:8080 nullkey-backend
 
-Namun:
-- Jika Anda memodifikasi kode atau menggunakannya sebagai layanan jaringan (SaaS),
-  Anda harus menerbitkan kode sumber lengkap dari versi Anda.
-- Penggunaan komersial tanpa merilis kode sumber TIDAK diperbolehkan.
+# Frontend (build with WS URL targeting your backend)
+cd frontend
+docker build --build-arg NEXT_PUBLIC_WS_URL=ws://localhost:8080 -t nullkey-frontend .
+docker run -d -p 3000:80 nullkey-frontend
+```
 
-Untuk lisensi komersial atau penggunaan closed-source,
-silakan hubungi: <nullkey@optimaseo.id>
+## Testing
 
-## Hak Cipta
+```bash
+# Backend — 57 unit tests (Room, Manager, ReplayGuard, Validators, Forwarder)
+cd backend
+npm test
+npm run lint        # ESLint (0 errors)
+npm run format:check
 
-Hak cipta © 2026 OptimaSeo. Seluruh hak dilindungi.
+# Frontend — 17 unit tests (encryption, session, storage)
+cd frontend
+npm test
+```
+
+## Development
+
+```bash
+cd backend
+npm run dev         # ts-node hot-reload
+
+cd frontend
+npm run dev         # Next.js dev server
+```
+
+## License
+
+AGPL-3.0 — see [LICENSE](backend/LICENSE).
+
+For commercial / closed-source licensing: <nullkey@optimaseo.id>
+
+---
+
+**No Logs. No Accounts. No Trace.**

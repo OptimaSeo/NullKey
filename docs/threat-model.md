@@ -54,7 +54,7 @@ Dokumen ini menguraikan model ancaman untuk NullKey, merinci asumsi keamanan, an
 - **Analisis Volume**: Pola volume pesan mungkin mengungkapkan informasi
 
 ### Terhadap Rekayasa Sosial
-- **Serangan Phising**: Pengguna mungkin ditipu untuk mengungkapkan rahasia ruangan
+- **Serangan Phising**: Pengguna mungkin ditipu untuk mengungkapkan rahasia ruangan atau token undangan
 - **Penyamaran**: Lawan mungkin menyamar sebagai kontak terpercaya di luar platform
 - **Paksaan**: Pengguna mungkin dipaksa untuk mengungkapkan informasi di bawah tekanan
 
@@ -64,8 +64,9 @@ Dokumen ini menguraikan model ancaman untuk NullKey, merinci asumsi keamanan, an
 - Enkripsi end-to-end dengan X25519/AES-256-GCM
 - Retensi data sisi-server minimal
 - Kedaluwarsa otomatis ruangan dan pesan
-- Pembatasan frekuensi dan tindakan pencegahan penyalahgunaan
 - Generasi dan penyimpanan kunci aman di klien
+- Token undangan satu kali untuk bergabung ke ruangan (rahasia ruangan tidak pernah dikirim ke server)
+- Verifikasi sidik jari kunci publik melalui tautan undangan (pencegahan MITM)
 
 ### Belum Diimplementasikan (Masa Depan)
 - Obfuskasi lalu lintas canggih

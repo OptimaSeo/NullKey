@@ -1,4 +1,5 @@
 import WebSocket from 'ws';
+import { config } from '../config';
 
 // Validation functions for incoming WebSocket messages
 export function validateMessageFormat(data: WebSocket.Data): boolean {
@@ -19,24 +20,35 @@ export function validateMessageFormat(data: WebSocket.Data): boolean {
     }
     
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
+}
+
+/**
+ * Validate total payload size.
+ * Returns true if the payload is under the configured limit.
+ */
+export function validatePayloadSize(payload: any): boolean {
+  if (!payload || typeof payload !== 'object') return true;
+  // Rough estimate via JSON stringify length
+  const size = Buffer.byteLength(JSON.stringify(payload), 'utf-8');
+  return size <= config.maxMessageSizeBytes;
 }
 
 export function validateRoomCreation(payload: any): boolean {
   if (!payload || typeof payload !== 'object') {
     return false;
   }
-  
+
   if (!payload.room_id || typeof payload.room_id !== 'string') {
     return false;
   }
-  
-  if (!payload.room_secret || typeof payload.room_secret !== 'string') {
+
+  if (!payload.invite_token || typeof payload.invite_token !== 'string') {
     return false;
   }
-  
+
   return true;
 }
 
@@ -44,11 +56,15 @@ export function validateRoomJoin(payload: any): boolean {
   if (!payload || typeof payload !== 'object') {
     return false;
   }
-  
-  if (!payload.room_secret || typeof payload.room_secret !== 'string') {
+
+  if (!payload.room_id || typeof payload.room_id !== 'string') {
     return false;
   }
-  
+
+  if (!payload.invite_token || typeof payload.invite_token !== 'string') {
+    return false;
+  }
+
   return true;
 }
 

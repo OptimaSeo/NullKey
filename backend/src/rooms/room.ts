@@ -1,4 +1,5 @@
 import { ClientConnection } from '../ws/handler';
+import { config } from '../config';
 
 export interface Room {
   id: string;
@@ -12,21 +13,21 @@ export class RoomModel {
   clients: ClientConnection[];
   createdAt: number;
   lastActivity: number;
+  private maxParticipants: number;
 
-  constructor(id: string) {
+  constructor(id: string, maxParticipants?: number) {
     this.id = id;
     this.clients = [];
     this.createdAt = Date.now();
     this.lastActivity = Date.now();
+    this.maxParticipants = maxParticipants ?? config.maxParticipantsPerRoom;
   }
 
   addClient(client: ClientConnection): boolean {
-    // Limit to 10 clients per room as per MVP spec
-    if (this.clients.length >= 10) {
+    if (this.clients.length >= this.maxParticipants) {
       return false;
     }
     
-    // Check if client is already in the room
     if (this.clients.some(c => c.ws === client.ws)) {
       return false;
     }
@@ -60,7 +61,8 @@ export class RoomModel {
     this.lastActivity = Date.now();
   }
 
-  isExpired(maxIdleTime: number = 10 * 60 * 1000): boolean { // 10 minutes default
-    return Date.now() - this.lastActivity > maxIdleTime;
+  isExpired(maxIdleTime?: number): boolean {
+    const idle = maxIdleTime ?? config.roomIdleTimeoutMinutes * 60 * 1000;
+    return Date.now() - this.lastActivity > idle;
   }
 }

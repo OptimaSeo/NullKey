@@ -1,7 +1,3 @@
-// Entry point for frontend application
-import { createRoot } from 'react-dom/client';
-import App from './App';
-
-const container = document.getElementById('root');
-const root = createRoot(container!);
-root.render(<App />);
+// Entry point for frontend application (Next.js App Router handles rendering)
+export { WebSocketClient } from './socket/client';
+export * from './crypto';

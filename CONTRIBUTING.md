@@ -1,61 +1,80 @@
-# Berkontribusi pada NullKey
+# Contributing to NullKey
 
-Terima kasih atas minat Anda untuk berkontribusi pada NullKey! Dokumen ini menjelaskan pedoman untuk berkontribusi pada aplikasi obrolan anonim yang berfokus pada privasi ini.
+## Prerequisites
 
-## Filosofi Keamanan Terlebih Dahulu
+- Node.js 20+
+- npm 9+
 
-NullKey mengutamakan privasi dan keamanan pengguna di atas segalanya. Saat berkontribusi:
+## Setup
 
-- Jangan pernah menambahkan fitur yang membahayakan anonimitas pengguna
-- Ikuti model ancaman yang diuraikan dalam `docs/threat-model.md`
-- Pastikan tidak ada data plaintext yang disimpan di server
-- Jaga paparan metadata seminimal mungkin
-- Ikuti desain kriptografi dalam `docs/crypto-design.md`
+```bash
+git clone https://github.com/your-org/nullkey.git
+cd nullkey
 
-## Aturan
+# Backend
+cd backend
+npm install
 
-- Tidak ada permintaan fitur yang melemahkan privasi
-- Tidak ada telemetry, pelacakan, atau analitik
-- Tidak ada fitur identifikasi pengguna
-- Tidak ada sistem akun persisten
-- Tidak ada penyimpanan data plaintext di server
-- Ikuti spesifikasi MVP dalam `mvp.md`
+# Frontend
+cd ../frontend
+npm install
+```
 
-## Setup Pengembangan
+## Development
 
-1. Fork repositori
-2. Clone hasil fork Anda: `git clone https://github.com/OptimaSeo/NullKey.git`
-3. Navigasi ke direktori proyek: `cd NullKey`
-4. Install dependensi:
-   - Backend: `cd backend && npm install`
-   - Frontend: `cd frontend && npm install`
+```bash
+# Backend (http://localhost:8080)
+cd backend
+npm run dev
 
-## Gaya Kode
+# Frontend (http://localhost:3000)
+cd frontend
+npm run dev
+```
 
-- Ikuti gaya kode yang sudah ada dalam proyek
-- Gunakan format yang konsisten dan nama variabel yang bermakna
-- Jaga pemisahan antara kripto sisi klien dan relay sisi server
-- Dokumentasikan keputusan yang relevan dengan keamanan
+Open two browser tabs at `http://localhost:3000`. Create a room in one, join with the secret in the other.
 
-## Pengujian
+## Code Style
 
-Pastikan untuk menguji perubahan Anda secara menyeluruh sebelum mengirimkan pull request. Perhatikan khususnya:
-- Fungsi enkripsi end-to-end
-- Pengiriman dan penerimaan pesan
-- Pembuatan dan bergabung ruangan
-- Batas keamanan antara server dan klien
+- **TypeScript** — strict mode, no `any` in new code
+- **Formatting** — Prettier (single quotes, trailing commas, 100 width)
+- **Linting** — ESLint (run `npm run lint` before pushing)
+- **Commits** — clear, concise messages in English
 
-## Pull Request
+Run these before committing:
 
-- Satu fitur per PR
-- Penjelasan yang jelas diperlukan
-- Dampak keamanan harus didokumentasikan
-- Ikuti arsitektur yang dijelaskan dalam `docs/architecture.md`
-- Referensikan bagian-bagian relevan dari spesifikasi MVP jika diperlukan
-- Pastikan tidak ada data plaintext yang terekspos ke server
+```bash
+# Backend
+cd backend
+npm run lint
+npm run format:check
+npm test
 
-## Cakupan MVP
+# Frontend
+cd frontend
+npm run lint
+npm run format:check
+npm test
+```
 
-Proyek ini saat ini mengimplementasikan fitur-fitur MVP yang didefinisikan dalam `mvp.md`. Harap pastikan kontribusi Anda selaras dengan cakupan saat ini dan jangan menambahkan fitur di luar persyaratan MVP yang ditentukan kecuali secara eksplisit dibahas dalam sebuah isu terlebih dahulu.
+## Project Structure
 
-Dengan berkontribusi, Anda setuju bahwa kode Anda dilisensikan di bawah AGPL‑3.0 dan hak cipta menjadi milik OptimaSeo.
+```
+backend/       WebSocket relay server
+frontend/      Next.js client (static export)
+docs/          Protocol spec, threat model, crypto design
+```
+
+See `README.md` in each package for internal architecture.
+
+## Pull Requests
+
+1. Fork the repo.
+2. Create a branch: `git checkout -b feature/my-feature`.
+3. Make your changes. Keep them focused — one PR per feature or fix.
+4. Ensure all tests pass and lint is clean.
+5. Open a PR against `main`. Include a clear description of what and why.
+
+## License
+
+By contributing, you agree that your contributions will be licensed under AGPL-3.0.

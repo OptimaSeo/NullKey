@@ -18,6 +18,11 @@ export interface MessagePayload {
   ciphertext: string;
   nonce: string;
   timestamp: number;
+  message_type?: 'text' | 'file';
+  file_name?: string;
+  file_size?: number;
+  file_type?: string;
+  file_hash?: string;
 }
 
 export interface KeyExchangePayload {
@@ -27,9 +32,40 @@ export interface KeyExchangePayload {
   sender_username: string;
 }
 
+export type ServerEvent = 'success' | 'error' | 'key:exchange' | 'message:receive' | 'client:joined' | 'client:left' | 'typing:start' | 'typing:stop';
+type MessageListener = (event: ServerEvent, payload: any) => void;
+type StatusListener = (status: 'open' | 'close' | 'error', detail?: Event | CloseEvent) => void;
+
+/**
+ * Converts a Uint8Array to a lowercase hex string.
+ */
+export function toHex(bytes: Uint8Array): string {
+  let out = '';
+  for (let i = 0; i < bytes.length; i++) {
+    out += bytes[i].toString(16).padStart(2, '0');
+  }
+  return out;
+}
+
+/**
+ * Converts a lowercase hex string to a Uint8Array.
+ */
+export function fromHex(hex: string): Uint8Array {
+  if (hex.length % 2 !== 0) {
+    throw new Error('Invalid hex string length');
+  }
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(hex.substr(i * 2, 2), 16);
+  }
+  return out;
+}
+
 export class WebSocketClient {
   private ws: WebSocket | null = null;
   private url: string;
+  private messageListeners: Set<MessageListener> = new Set();
+  private statusListeners: Set<StatusListener> = new Set();
 
   constructor(serverUrl: string) {
     this.url = serverUrl;
@@ -37,29 +73,75 @@ export class WebSocketClient {
 
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
+      // If already connected, resolve immediately.
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        resolve();
+        return;
+      }
+      // Tear down any half-open socket first.
+      this.teardown();
+
       this.ws = new WebSocket(this.url);
 
       this.ws.onopen = () => {
-        console.log('Connected to server');
+        this.notifyStatus('open');
         resolve();
       };
 
       this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        reject(error);
+        this.notifyStatus('error', error);
+        // Only reject if we never opened; otherwise let onclose handle it.
+        if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
+          reject(error);
+        }
       };
 
-      this.ws.onclose = () => {
-        console.log('Disconnected from server');
+      this.ws.onclose = (event) => {
+        this.notifyStatus('close', event);
+      };
+
+      this.ws.onmessage = (event) => {
+        let data: any;
+        try {
+          data = JSON.parse(typeof event.data === 'string' ? event.data : event.data.toString());
+        } catch (err) {
+          console.error('Failed to parse WebSocket message:', err);
+          return;
+        }
+        const evt = data.event as ServerEvent;
+        const payload = data.payload;
+        // Snapshot to a local array so a listener can safely unsubscribe during iteration.
+        const listeners = Array.from(this.messageListeners);
+        for (const listener of listeners) {
+          try {
+            listener(evt, payload);
+          } catch (err) {
+            console.error('Listener threw:', err);
+          }
+        }
       };
     });
   }
 
   disconnect(): void {
+    this.teardown();
+  }
+
+  private teardown(): void {
     if (this.ws) {
-      this.ws.close();
-      this.ws = null;
+      try {
+        this.ws.onopen = null;
+        this.ws.onerror = null;
+        this.ws.onclose = null;
+        this.ws.onmessage = null;
+        if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+          this.ws.close();
+        }
+      } catch {
+        // ignore
+      }
     }
+    this.ws = null;
   }
 
   sendMessage(event: string, payload: any): void {
@@ -70,34 +152,49 @@ export class WebSocketClient {
     }
   }
 
-  onMessage(callback: (event: string, payload: any) => void): void {
-    if (this.ws) {
-      this.ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        callback(data.event, data.payload);
-      };
-    }
+  /**
+   * Subscribe to incoming server messages. Returns an unsubscribe function.
+   * Multiple listeners are supported.
+   */
+  onMessage(listener: MessageListener): () => void {
+    this.messageListeners.add(listener);
+    return () => {
+      this.messageListeners.delete(listener);
+    };
   }
 
-  onError(callback: (error: Event) => void): void {
-    if (this.ws) {
-      this.ws.onerror = callback;
-    }
+  /**
+   * Subscribe to connection status changes. Returns an unsubscribe function.
+   */
+  onStatus(listener: StatusListener): () => void {
+    this.statusListeners.add(listener);
+    return () => {
+      this.statusListeners.delete(listener);
+    };
   }
 
-  onClose(callback: (event: CloseEvent) => void): void {
-    if (this.ws) {
-      this.ws.onclose = callback;
+  private notifyStatus(status: 'open' | 'close' | 'error', detail?: Event | CloseEvent): void {
+    const listeners = Array.from(this.statusListeners);
+    for (const listener of listeners) {
+      try {
+        listener(status, detail);
+      } catch (err) {
+        console.error('Status listener threw:', err);
+      }
     }
   }
 
   // Specific methods for NullKey events
-  createRoom(roomId: string, roomSecret: string): void {
-    this.sendMessage('room:create', { room_id: roomId, room_secret: roomSecret });
+  createRoom(roomId: string, inviteToken: string): void {
+    this.sendMessage('room:create', { room_id: roomId, invite_token: inviteToken });
   }
 
-  joinRoom(roomId: string, roomSecret: string): void {
-    this.sendMessage('room:join', { room_id: roomId, room_secret: roomSecret });
+  joinRoom(roomId: string, inviteToken: string): void {
+    this.sendMessage('room:join', { room_id: roomId, invite_token: inviteToken });
+  }
+
+  leaveRoom(): void {
+    this.sendMessage('room:leave', {});
   }
 
   sendKeyExchange(payload: KeyExchangePayload): void {
@@ -106,5 +203,13 @@ export class WebSocketClient {
 
   sendMessageToRoom(payload: MessagePayload): void {
     this.sendMessage('message:send', payload);
+  }
+
+  sendTypingStart(roomId: string): void {
+    this.sendMessage('typing:start', { room_id: roomId });
+  }
+
+  sendTypingStop(roomId: string): void {
+    this.sendMessage('typing:stop', { room_id: roomId });
   }
 }

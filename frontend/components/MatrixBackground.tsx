@@ -33,16 +33,17 @@ export default function MatrixBackground() {
     const matrixChars = "010101NULLKEYXYZ<>[]{}";
 
     function drawMatrix() {
+      const c = ctx!;
       // Background transparan untuk efek jejak (trail)
-      ctx.fillStyle = 'rgba(5, 5, 5, 0.05)';
-      ctx.fillRect(0, 0, width, height);
+      c.fillStyle = 'rgba(5, 5, 5, 0.05)';
+      c.fillRect(0, 0, width, height);
 
-      ctx.fillStyle = '#00ff41'; // Warna teks hijau
-      ctx.font = fontSize + 'px monospace';
+      c.fillStyle = '#00ff41'; // Warna teks hijau
+      c.font = fontSize + 'px monospace';
 
       for (let i = 0; i < drops.length; i++) {
         const text = matrixChars.charAt(Math.floor(Math.random() * matrixChars.length));
-        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+        c.fillText(text, i * fontSize, drops[i] * fontSize);
 
         // Reset posisi ke atas secara acak
         if (drops[i] * fontSize > height && Math.random() > 0.975) {

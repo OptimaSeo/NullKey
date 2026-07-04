@@ -1,9 +1,7 @@
 import express from 'express';
 import { RoomManager } from '../rooms/manager';
 
-export function setupRoutes(app: express.Application): void {
-  const roomManager = new RoomManager();
-
+export function setupRoutes(app: express.Application, roomManager: RoomManager): void {
   // Health check endpoint
   app.get('/health', (req, res) => {
     res.status(200).json({

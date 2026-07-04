@@ -1,0 +1,31 @@
+name: Feature Request
+description: Suggest an idea for NullKey
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Use Case
+      description: What problem are you trying to solve?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: What would you like to see implemented?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any workarounds or alternative approaches?
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope Check
+      description: Please confirm this aligns with NullKey's direction
+      options:
+        - label: This does not require user accounts, database, or persistent message history
+          required: true

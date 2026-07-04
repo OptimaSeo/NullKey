@@ -1,4 +1,5 @@
 import { RoomManager } from '../rooms/manager';
+import { config } from '../config';
 
 export class CleanupService {
   private roomManager: RoomManager;
@@ -10,20 +11,20 @@ export class CleanupService {
 
   /**
    * Start the periodic cleanup process
-   * @param intervalMs Interval in milliseconds between cleanup runs (default: 1 minute)
+   * @param intervalMs Interval in milliseconds between cleanup runs (default: from config)
    */
-  startCleanup(intervalMs: number = 60000): void {
-    // Clear any existing interval
+  startCleanup(intervalMs?: number): void {
+    const interval = intervalMs ?? config.cleanupIntervalMs;
+
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
     }
 
-    // Set up new interval
     this.cleanupInterval = setInterval(() => {
       this.performCleanup();
-    }, intervalMs);
+    }, interval);
 
-    console.log(`Cleanup service started with ${intervalMs}ms interval`);
+    console.log(`Cleanup service started with ${interval}ms interval`);
   }
 
   /**

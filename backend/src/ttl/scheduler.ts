@@ -60,7 +60,7 @@ export class Scheduler {
     this.cleanupService.stopCleanup();
     
     // Clear all scheduled tasks
-    for (const [_, task] of this.scheduledTasks) {
+    for (const [, task] of this.scheduledTasks) {
       clearTimeout(task);
     }
     this.scheduledTasks.clear();
