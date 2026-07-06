@@ -1,0 +1,58 @@
+/*
+ * NullKey
+ * Copyright (c) 2026 OptimaSeo
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, version 3.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.scanlines {
+  background: linear-gradient(
+    to bottom,
+    rgba(255,255,255,0),
+    rgba(255,255,255,0) 50%,
+    rgba(0,0,0,0.2) 50%,
+    rgba(0,0,0,0.2)
+  );
+  background-size: 100% 4px;
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Scrollbar kustom untuk tampilan desktop */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #000; 
+}
+::-webkit-scrollbar-thumb {
+  background: #003b00; 
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00ff41; 
+}
+
+/* Warna kustom */
+.bg-terminal-bg {
+  background-color: #050505;
+}
+
+.bg-card-bg {
+  background-color: #0a0a0a;
+}
+
+.border-dark-green {
+  border-color: #003b00;
+}
+
+.text-neon-green {
+  color: #00ff41;
+}

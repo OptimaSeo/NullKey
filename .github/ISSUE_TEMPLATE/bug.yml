@@ -1,0 +1,44 @@
+name: Bug Report
+description: Report a bug or unexpected behaviour
+labels: [bug]
+body:
+  - type: textarea
+    id: describe
+    attributes:
+      label: Description
+      description: What happened? What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this?
+      placeholder: |
+        1. Open the app
+        2. Create a room
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: Browser, OS, Node version, Docker (if applicable)
+      placeholder: Chrome 120 / Ubuntu 24.04 / Node 20
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs / Console Output
+      description: Please copy and paste any relevant console errors or log output.
+      render: shell
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Security
+      description: By submitting this issue, you confirm this is not a security vulnerability (see SECURITY.md for disclosure policy)
+      options:
+        - label: This is a bug, not a security vulnerability
+          required: true
