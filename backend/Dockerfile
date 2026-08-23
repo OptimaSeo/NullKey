@@ -31,5 +31,6 @@ USER nullkey
 EXPOSE 2020
 
 ENV NODE_ENV=production
+ENV PORT=2020
 
 CMD ["node", "dist/server.js"]

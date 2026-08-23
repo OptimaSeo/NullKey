@@ -8,10 +8,15 @@
  */
 
 // next.config.js
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'export',
   trailingSlash: true,
+  // Pin the workspace root so Next.js doesn't guess it from stray
+  // lockfiles in parent directories.
+  outputFileTracingRoot: path.join(__dirname),
   images: {
     unoptimized: true
   }

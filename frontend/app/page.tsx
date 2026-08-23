@@ -19,7 +19,18 @@ import { WebSocketClient, toHex, fromHex } from '../src/socket/client';
 import { saveKeyPair, loadKeyPair } from '../src/storage';
 import { PeerSessionManager } from '../services/peer-session.service';
 
-type RelayEvent = 'success' | 'error' | 'key:exchange' | 'message:receive' | 'client:joined' | 'client:left' | 'typing:start' | 'typing:stop';
+type RelayEvent = 'success' | 'error' | 'key:exchange' | 'message:receive' | 'client:joined' | 'client:left' | 'typing:start' | 'typing:stop' | 'room:closed';
+
+// Must stay in sync with the backend MAX_FILE_SIZE_BYTES (default 100 MB).
+// The backend sizes its WebSocket frame budget to carry a fully encrypted,
+// base64-encoded file of this size in a single message.
+const MAX_FILE_BYTES = Number(process.env.NEXT_PUBLIC_MAX_FILE_SIZE_BYTES) || 104857600;
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${bytes} B`;
+}
 
 interface ChatMessage {
   id: string;
@@ -117,18 +128,16 @@ function b64ToBuf(b64: string): Uint8Array {
 function isFileMessage(msg: ChatMessage): boolean {
   try {
     const meta = JSON.parse(msg.plaintext);
-    return !!meta.file_name;
+    return meta.message_type === 'file';
   } catch {
     return false;
   }
 }
 
 function FileMessage({ msg, onDownload }: { msg: ChatMessage; onDownload: (m: ChatMessage) => void }) {
-  let fileName = 'file';
   let fileSize = 0;
   try {
     const meta = JSON.parse(msg.plaintext);
-    fileName = meta.file_name || 'file';
     fileSize = meta.file_size || 0;
   } catch { /* */ }
   const sizeLabel = fileSize >= 1048576
@@ -150,7 +159,7 @@ function FileMessage({ msg, onDownload }: { msg: ChatMessage; onDownload: (m: Ch
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-neon-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
             </svg>
-            <span className="text-neon-green truncate">{fileName}</span>
+            <span className="text-neon-green">[encrypted file]</span>
             <span className="text-gray-500 text-xs shrink-0">{sizeLabel}</span>
           </div>
           <button
@@ -184,7 +193,6 @@ export default function HomePage() {
   const [peers, setPeers] = useState<Peer[]>([]);
   const [draft, setDraft] = useState('');
   const [status, setStatus] = useState<string>('');
-  const [inviteCopied, setInviteCopied] = useState(false);
   const [typingPeers, setTypingPeers] = useState<Map<string, number>>(new Map());
   const [keysRestored, setKeysRestored] = useState(false);
   const [selectedFile, setSelectedFile] = useState<{ file: File; data: Uint8Array } | null>(null);
@@ -193,7 +201,6 @@ export default function HomePage() {
   const sessionManagerRef = useRef<SessionManager | null>(null);
   const wsClientRef = useRef<WebSocketClient | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const typingTimersRef = useRef<Map<string, number>>(new Map());
   const typingStopTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const activeRoomIdRef = useRef('');
@@ -334,6 +341,11 @@ export default function HomePage() {
                 return next;
               });
             }
+            break;
+          }
+          case 'room:closed': {
+            addSystemMessage('Room closed by server (expired).');
+            resetRoomLocal();
             break;
           }
         }
@@ -509,6 +521,12 @@ export default function HomePage() {
         return;
       }
 
+      // Targeted message for another peer — we cannot decrypt it and were
+      // never meant to; ignore silently instead of spamming decrypt errors.
+      if (payload.recipient_fingerprint && payload.recipient_fingerprint !== sm.fingerprint) {
+        return;
+      }
+
       const salt = fromHex(payload.room_id || '');
       const isFile = payload.message_type === 'file';
 
@@ -519,13 +537,13 @@ export default function HomePage() {
             id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             fingerprint: payload.sender_fingerprint,
             username: payload.sender_username || 'Anonymous',
+            // File name/type/hash are inside the encrypted envelope — only
+            // inherently-visible metadata stays on the wire.
             plaintext: JSON.stringify({
+              message_type: 'file',
               ciphertext: payload.ciphertext,
               nonce: payload.nonce,
-              file_name: payload.file_name || 'unnamed',
               file_size: payload.file_size || 0,
-              file_type: payload.file_type || 'application/octet-stream',
-              file_hash: payload.file_hash || '',
             }),
             timestamp: payload.timestamp || Date.now(),
             mine: false,
@@ -613,7 +631,6 @@ export default function HomePage() {
 
     let roomSecret = secret;
     let inviteToken = token;
-    let fpOverride: string | null = null;
 
     // If called without explicit args, try parsing from hash or manual input
     if (!roomSecret || !inviteToken) {
@@ -700,14 +717,16 @@ export default function HomePage() {
     }
   };
 
-  const handleLeaveRoom = () => {
-    wsClientRef.current?.leaveRoom();
+  // Local teardown shared by explicit leave and server-forced close
+  // (room expired). Does not send anything to the server.
+  const resetRoomLocal = useCallback(() => {
     peerSessionManagerRef.current.onLeaveRoom();
     clearRoomSession();
     setActiveRoomSecret('');
     setActiveRoomId('');
     activeRoomIdRef.current = '';
     latestInviteTokenRef.current = '';
+    setTypingPeers(new Map());
     setPeers([]);
     setMessages([]);
     setShowChatInterface(false);
@@ -715,6 +734,11 @@ export default function HomePage() {
     if (typeof window !== 'undefined' && window.location.hash) {
       history.replaceState(null, '', window.location.pathname + window.location.search);
     }
+  }, []);
+
+  const handleLeaveRoom = () => {
+    wsClientRef.current?.leaveRoom();
+    resetRoomLocal();
   };
 
   const handleSendMessage = async () => {
@@ -748,6 +772,7 @@ export default function HomePage() {
           ciphertext: toHex(ciphertext),
           nonce: toHex(nonce),
           timestamp: Date.now(),
+          recipient_fingerprint: peer.fingerprint,
         });
         firstSent = true;
       } catch (err) {
@@ -772,26 +797,13 @@ export default function HomePage() {
     }
   };
 
-  const handleCopyInvite = async () => {
-    const sm = sessionManagerRef.current;
-    const fp = sm?.fingerprint ?? '';
-    const link = getInviteLink(activeRoomSecret, latestInviteToken, fp);
-    try {
-      if (navigator.clipboard) await navigator.clipboard.writeText(link || activeRoomSecret);
-      setInviteCopied(true);
-      setTimeout(() => setInviteCopied(false), 1500);
-    } catch {
-      // ignore clipboard errors
-    }
-  };
-
   // ── file sharing ──
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 100 * 1024 * 1024) {
-      addSystemMessage('File too large — maximum 100 MB');
+    if (file.size > MAX_FILE_BYTES) {
+      addSystemMessage(`File too large — maximum ${formatBytes(MAX_FILE_BYTES)}`);
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -822,7 +834,21 @@ export default function HomePage() {
       if (!sharedSecret) continue;
       try {
         const fileHash = await computeFileHash(selectedFile.data);
-        const { ciphertext, nonce } = await encryptMessage(selectedFile.data, sharedSecret, salt);
+        // Encrypted envelope: [u32be headerLen][header JSON][file bytes].
+        // Name/type/hash never reach the server in plaintext.
+        const headerBytes = new TextEncoder().encode(
+          JSON.stringify({
+            file_name: selectedFile.file.name,
+            file_type: selectedFile.file.type || 'application/octet-stream',
+            file_hash: fileHash,
+          }),
+        );
+        const envelope = new Uint8Array(4 + headerBytes.length + selectedFile.data.length);
+        new DataView(envelope.buffer).setUint32(0, headerBytes.length, false);
+        envelope.set(headerBytes, 4);
+        envelope.set(selectedFile.data, 4 + headerBytes.length);
+
+        const { ciphertext, nonce } = await encryptMessage(envelope, sharedSecret, salt);
         ws.sendMessageToRoom({
           room_id: activeRoomId,
           sender_fingerprint: sm.fingerprint,
@@ -831,10 +857,8 @@ export default function HomePage() {
           nonce: toHex(nonce),
           timestamp: Date.now(),
           message_type: 'file',
-          file_name: selectedFile.file.name,
+          recipient_fingerprint: peer.fingerprint,
           file_size: selectedFile.file.size,
-          file_type: selectedFile.file.type || 'application/octet-stream',
-          file_hash: fileHash,
         });
         firstSent = true;
       } catch (err) {
@@ -849,6 +873,7 @@ export default function HomePage() {
         fingerprint: sm.fingerprint,
         username: username || 'me',
         plaintext: JSON.stringify({
+          message_type: 'file',
           file_name: selectedFile.file.name,
           file_size: selectedFile.file.size,
           file_type: selectedFile.file.type || 'application/octet-stream',
@@ -876,21 +901,29 @@ export default function HomePage() {
       const ciphertext = b64ToBuf(meta.ciphertext);
       const nonce = fromHex(meta.nonce);
       const salt = fromHex(activeRoomId);
-      const decrypted = await decryptFile(ciphertext, nonce, sharedSecret, salt);
+      const envelope = await decryptFile(ciphertext, nonce, sharedSecret, salt);
 
-      if (meta.file_hash) {
-        const actualHash = await computeFileHash(decrypted);
-        if (actualHash !== meta.file_hash) {
+      // Parse [u32be headerLen][header JSON][file bytes]
+      if (envelope.length < 4) throw new Error('Envelope too short');
+      const view = new DataView(envelope.buffer, envelope.byteOffset, envelope.byteLength);
+      const headerLen = view.getUint32(0, false);
+      if (4 + headerLen > envelope.length) throw new Error('Invalid envelope header length');
+      const header = JSON.parse(new TextDecoder().decode(envelope.subarray(4, 4 + headerLen)));
+      const content = envelope.subarray(4 + headerLen);
+
+      if (header.file_hash) {
+        const actualHash = await computeFileHash(content);
+        if (actualHash !== header.file_hash) {
           addSystemMessage('File integrity check failed — hash mismatch. The file may be corrupted or tampered with.');
           return;
         }
       }
 
-      const blob = new Blob([decrypted.buffer as ArrayBuffer], { type: meta.file_type });
+      const blob = new Blob([content.slice().buffer as ArrayBuffer], { type: header.file_type || 'application/octet-stream' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = meta.file_name;
+      a.download = header.file_name || 'file';
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -986,8 +1019,11 @@ export default function HomePage() {
                 className="px-3 py-1 border border-dark-green text-xs text-neon-green hover:bg-neon-green hover:text-black transition"
                 onClick={() => {
                   setLatestRoomSecret(activeRoomSecret);
-                  if (sessionManagerRef.current) {
+                  if (sessionManagerRef.current && wsClientRef.current && activeRoomId) {
                     const newToken = SessionManager.generateInviteToken();
+                    // Register the fresh one-time token with the server;
+                    // without this the invite link would be rejected on join.
+                    wsClientRef.current.createInvite(activeRoomId, newToken);
                     setLatestInviteToken(newToken);
                     latestInviteTokenRef.current = newToken;
                   }
@@ -1151,7 +1187,7 @@ export default function HomePage() {
           />
           <FeaturePanel
             title="Ephemeral"
-            desc="Messages stored in RAM, auto-delete after delivery, rooms auto-expire."
+            desc="Messages are never stored — relayed and dropped. Rooms auto-expire on idle or lifetime."
           />
         </section>
 
@@ -1271,6 +1307,7 @@ function QRCodeModal({ inviteLink, roomSecret, creatorFingerprint, onClose }: {
           {/* QR Code */}
           <div className="flex justify-center mb-6">
             {qrDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- data: URL, images are unoptimized
               <img src={qrDataUrl} alt="QR Code" className="border border-dark-green" width={200} height={200} />
             ) : (
               <div className="w-[200px] h-[200px] border border-dark-green flex items-center justify-center text-gray-600 text-xs">

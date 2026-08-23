@@ -44,7 +44,10 @@ Request to join an existing chat room.
 }
 ```
 
-Note: The invite token is verified and consumed (single-use) by the server. The server never learns the `room_secret`.
+Note: The invite token is verified by the server. The first `room:join` binds
+the token to the joining fingerprint (single use per identity); the bound
+fingerprint can reuse it to reconnect, while any other fingerprint is
+rejected. The server never learns the `room_secret`.
 
 #### `key:exchange`
 Exchange public keys with other participants in the room.
@@ -72,7 +75,30 @@ Send an encrypted message to the room.
   "nonce": "nonce used for encryption (hex encoded)",
   "timestamp": 1234567890,
   "message_type": "text|file (optional)",
+  "recipient_fingerprint": "sha256 hash of recipient's public key (optional, enables targeted delivery)",
   "file_size": 12345 (optional, required if message_type=file)
+}
+```
+
+When `recipient_fingerprint` is present the server delivers the message only
+to that participant instead of broadcasting to the room. This is how
+multi-party chats avoid sending undecryptable copies to other peers.
+
+For file messages, everything sensitive travels **inside the encrypted
+envelope**: `[u32 big-endian header length][header JSON: file_name, file_type,
+file_hash][raw file bytes]`. Only `file_size` — which is inherently visible
+from the ciphertext length — stays on the wire.
+
+#### `invite:create`
+Register an additional one-time invite token for a room the sender is
+currently in. Used by clients to mint new invite links after the original
+token has been bound.
+
+**Payload:**
+```json
+{
+  "room_id": "room identifier",
+  "invite_token": "fresh 256-bit hex token"
 }
 ```
 
@@ -142,7 +168,8 @@ Encrypted message forwarded from another participant.
   "sender_username": "sender's display name",
   "ciphertext": "encrypted message content (hex encoded)",
   "nonce": "nonce used for encryption (hex encoded)",
-  "timestamp": 1234567890
+  "timestamp": 1234567890,
+  "recipient_fingerprint": "present when the message was targeted (optional)"
 }
 ```
 
@@ -190,6 +217,17 @@ Forwarded from sender to other participants in the room.
 }
 ```
 
+#### `room:closed`
+Sent immediately before the server removes an expired room. Sockets are then
+closed with code `4001`. Clients should reset to the home screen.
+
+**Payload:**
+```json
+{
+  "reason": "expired"
+}
+```
+
 ## Security Considerations
 
 ### Server Blindness
@@ -205,8 +243,9 @@ Forwarded from sender to other participants in the room.
 - Security depends on the confidentiality of the invite channel (out-of-band)
 
 ### Ephemeral Nature
-- Rooms automatically expire after 10 minutes of inactivity
-- Messages automatically expire after 5 minutes
+- Messages are never stored anywhere on the server — they are relayed in real time and dropped
+- `MESSAGE_TTL_MINUTES` only scopes the replay-protection nonce window
+- Rooms automatically expire after the idle timeout (`ROOM_IDLE_TIMEOUT_MINUTES`) or the absolute lifetime (`MAX_ROOM_LIFETIME_MINUTES`), whichever comes first
 - No persistent storage of message history
 
 ### Rate Limiting

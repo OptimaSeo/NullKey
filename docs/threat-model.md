@@ -33,13 +33,13 @@ This document outlines the threat model for NullKey, detailing security assumpti
 
 ### Against Network Observers
 - **Passive Monitoring**: All messages are end-to-end encrypted, preventing content inspection
-- **Traffic Correlation**: Limited protection against sophisticated correlation analysis
-- **Timing Analysis**: Basic protection through potential message batching
+- **Traffic Correlation**: No protection — IPs, timing, and ciphertext sizes are visible
+- **Timing Analysis**: No protection — no message batching or cover traffic is performed
 
 ### Against Other Users
-- **Malicious Participant**: Cannot impersonate other users due to public key verification
+- **Malicious Participant**: Cannot forge another participant's cryptographic identity — messages are bound to fingerprints via the shared secret. Display names, however, are unauthenticated and trivially spoofable
 - **Message Tampering**: Integrity protected by authenticated encryption
-- **Metadata Disclosure**: Limited to room membership and timing
+- **Metadata Disclosure**: Limited to room membership, usernames, timing, and ciphertext sizes
 
 ## Acknowledged Limitations
 
@@ -62,11 +62,13 @@ This document outlines the threat model for NullKey, detailing security assumpti
 
 ### Implemented
 - End-to-end encryption with X25519/AES-256-GCM
-- Minimal server-side data retention
-- Automatic room and message expiration
+- File metadata (name, type, checksum) encrypted inside the message envelope
+- Minimal server-side data retention (no message storage at all)
+- Automatic room expiration (idle timeout + absolute lifetime)
 - Secure client-side key generation and storage
 - One-time invite tokens for room joining (room secret never sent to server)
-- Public key fingerprint verification via invite link (MITM prevention)
+- Public key fingerprint verification via invite link (MITM prevention, invitee side)
+- Connection logs hash IP addresses
 
 ### Not Yet Implemented (Future)
 - Advanced traffic obfuscation

@@ -8,6 +8,7 @@
  */
 
 import Header from '../../components/Header';
+import Link from 'next/link';
 
 export default function LicensePage() {
   return (
@@ -138,7 +139,7 @@ export default function LicensePage() {
         <footer className="mt-12 text-center text-xs text-gray-600 space-y-1">
           <p>&copy; {new Date().getFullYear()} OptimaSeo. All rights reserved.</p>
           <p>
-            <a href="/" className="text-neon-green underline hover:opacity-80">Back to NullKey</a>
+            <Link href="/" className="text-neon-green underline hover:opacity-80">Back to NullKey</Link>
           </p>
         </footer>
       </main>

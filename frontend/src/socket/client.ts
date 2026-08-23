@@ -19,10 +19,8 @@ export interface MessagePayload {
   nonce: string;
   timestamp: number;
   message_type?: 'text' | 'file';
-  file_name?: string;
+  recipient_fingerprint?: string;
   file_size?: number;
-  file_type?: string;
-  file_hash?: string;
 }
 
 export interface KeyExchangePayload {
@@ -32,7 +30,7 @@ export interface KeyExchangePayload {
   sender_username: string;
 }
 
-export type ServerEvent = 'success' | 'error' | 'key:exchange' | 'message:receive' | 'client:joined' | 'client:left' | 'typing:start' | 'typing:stop';
+export type ServerEvent = 'success' | 'error' | 'key:exchange' | 'message:receive' | 'client:joined' | 'client:left' | 'typing:start' | 'typing:stop' | 'room:closed';
 type MessageListener = (event: ServerEvent, payload: any) => void;
 type StatusListener = (status: 'open' | 'close' | 'error', detail?: Event | CloseEvent) => void;
 
@@ -272,6 +270,10 @@ export class WebSocketClient {
   leaveRoom(): void {
     this.clearQueue();
     this.sendMessage('room:leave', {});
+  }
+
+  createInvite(roomId: string, inviteToken: string): void {
+    this.sendMessage('invite:create', { room_id: roomId, invite_token: inviteToken });
   }
 
   sendKeyExchange(payload: KeyExchangePayload): void {

@@ -17,11 +17,6 @@ const DB_NAME = 'NullKey';
 const DB_VERSION = 1;
 const STORE_NAME = 'session';
 
-interface DBSchema {
-  privateKey: string;
-  publicKey: string;
-}
-
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
