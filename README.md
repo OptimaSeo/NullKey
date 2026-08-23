@@ -42,7 +42,7 @@ Open `http://localhost:3000` in two tabs. Create a room in one, paste the invite
 | **Key persistence** | Keypair survives page reload (IndexedDB) |
 | **Invite token protocol** | Server validates one-time tokens; `room_secret` never leaves the client |
 | **MITM protection** | Peer fingerprint embedded in invite link, verified after key exchange |
-| **Encrypted file sharing** | Up to 100 MB per file, integrity verified with SHA-256 |
+| **Encrypted file sharing** | Up to 100 MB per file; name, type, and checksum travel inside the encrypted envelope |
 | **QR invites** | Scan from phone to join |
 | **Typing indicators** | Real-time relay of `typing:start` / `typing:stop` |
 | **Replay protection** | Nonce deduplication per sender fingerprint |
@@ -73,7 +73,7 @@ Open `http://localhost:3000` in two tabs. Create a room in one, paste the invite
 | Compromised client device | Once the browser is owned, all bets are off |
 | Network-level correlation | No TOR — IPs, timing, and message sizes are visible |
 | Forward secrecy | Single X25519 keypair per session; no Double Ratchet |
-| Metadata | Server sees IPs, connection timing, and participant fingerprints |
+| Metadata | Server sees IPs (hashed in logs), connection timing, participant fingerprints, usernames, ciphertext sizes |
 
 **Forward secrecy notice:** NullKey uses a static X25519 keypair. If a private key is compromised, all past messages in that session can be decrypted. This is a deliberate trade-off for simplicity.
 
@@ -88,7 +88,7 @@ cp .env.example .env
 Key variables:
 | Variable | Default | Description |
 |---|---|---|
-| `ALLOWED_ORIGINS` | `http://localhost:3000` | Comma-separated allowed WebSocket origins |
+| `ALLOWED_ORIGINS` | `http://localhost:3000` | Comma-separated allowed WebSocket origins. Production MUST set this to the origin browsers use. |
 | `RATE_LIMIT_MAX_CONNECTIONS_PER_IP` | `20` | Max concurrent WebSocket connections per IP |
 | `MAX_PARTICIPANTS_PER_ROOM` | `10` | Max clients per room |
 | `REPLAY_PROTECTION_ENABLED` | `true` | Enable/disable nonce replay check |
@@ -125,7 +125,7 @@ See [`.env.example`](.env.example) for the full list.
 ├── .env.example           All configurable environment variables
 ├── SECURITY.md            Vulnerability disclosure policy
 ├── CONTRIBUTING.md        Developer setup & PR guide
-└── docs/                  Protocol spec, crypto design, threat model
+└── docs/                  Protocol spec, crypto design, threat model, privacy assessment
 ```
 
 ---
@@ -136,15 +136,14 @@ See [`.env.example`](.env.example) for the full list.
 
 ```bash
 docker compose up -d
-# Frontend: http://localhost:3000
-# Backend:  http://localhost:8080
+# Frontend: http://localhost:1010
+# Backend:  http://localhost:2020
 ```
 
 Custom domain:
 
 ```bash
 ALLOWED_ORIGINS=https://chat.domain.com \
-  NEXT_PUBLIC_WS_URL=wss://relay.domain.com \
   docker compose up -d
 ```
 
@@ -153,10 +152,11 @@ ALLOWED_ORIGINS=https://chat.domain.com \
 ```bash
 # Backend
 docker build -t nullkey-backend ./backend
-docker run -d -p 8080:8080 nullkey-backend
+docker run -d -p 2020:2020 nullkey-backend
 
-# Frontend (set WS URL to your backend)
-docker build --build-arg NEXT_PUBLIC_WS_URL=ws://localhost:8080 -t nullkey-frontend ./frontend
+# Frontend — WS URL auto-detected from window.location at runtime,
+# so serve it behind a proxy that forwards /ws to the backend.
+docker build -t nullkey-frontend ./frontend
 docker run -d -p 3000:80 nullkey-frontend
 ```
 
@@ -182,4 +182,4 @@ For commercial / closed-source licensing: [nullkey@optimaseo.id](mailto:nullkey@
 
 ---
 
-**No Logs. No Accounts. No Trace.**
+**No message logs. No accounts.** Connection events are logged with IP addresses hashed — plaintext IPs are never written to logs.

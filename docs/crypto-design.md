@@ -53,8 +53,12 @@ NullKey implements end-to-end encryption (E2EE) using modern cryptographic primi
 
 ### Message Encryption
 1. Each message gets a unique random nonce (96 bits for AES-GCM)
-2. Message content is encrypted with AES-256-GCM using the derived session key
-3. Server only forwards ciphertext, nonce, and metadata
+2. Text messages are encrypted directly; file messages are encrypted as an
+   envelope: `[u32 big-endian header length][header JSON: file_name,
+   file_type, file_hash][raw file bytes]` — so file metadata is never
+   visible to the server
+3. The HKDF salt is derived from the room ID (never secret, but binds keys to the room)
+4. Server only forwards ciphertext, nonce, and routing metadata
 
 ### Message Decryption
 1. Receiver identifies the sender via fingerprint in metadata
@@ -71,12 +75,18 @@ NullKey implements end-to-end encryption (E2EE) using modern cryptographic primi
 
 ### Metadata Minimization
 - Server never sees plaintext messages or room secrets
+- File names, types, and checksums are encrypted inside the message envelope
 - Server only stores room IDs, one-time invite tokens, and ephemeral membership
-- Server does not store user identities or historical data
+- Still visible to the server: participant fingerprints, usernames (display
+  names — not authenticated), connection timing, and ciphertext sizes
+- Connection logs hash IP addresses; plaintext IPs are never logged
 
 ### Authentication and MITM Prevention
 - Public key fingerprints are embedded in the invite link alongside the room secret
-- Participants verify peer fingerprints after key exchange
-- If fingerprints do not match, the connection is rejected and a warning is displayed
+- The invitee verifies the inviter's fingerprint after key exchange; if it
+  does not match, the key is rejected and a warning is displayed. Note this
+  verification is one-directional — the inviter has no out-of-band channel
+  to authenticate the invitee
+- Additional peers in multi-party rooms are trusted on first key exchange
 - Security depends on the confidentiality of the invite channel (shared out-of-band)
 - Message integrity is verified through AES-GCM authentication tags

@@ -6,7 +6,9 @@ services:
       - "2020:2020"
     environment:
       - NODE_ENV=production
-      - ALLOWED_ORIGINS=
+      # Set this to the origin browsers use to reach the frontend,
+      # e.g. https://chat.example.com (defaults to http://localhost:3000)
+      - ALLOWED_ORIGINS=http://localhost:1010
       - PORT=2020
     restart: unless-stopped
     healthcheck:

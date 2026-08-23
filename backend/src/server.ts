@@ -21,7 +21,7 @@ import { WebSocketHandler } from './ws/handler';
 import { CleanupService } from './ttl/cleanup';
 import { Scheduler } from './ttl/scheduler';
 import { setupRoutes } from './relay/routes';
-import { config } from './config';
+import { config, wsMaxPayloadBytes } from './config';
 import { logger } from './logger';
 
 const app = express();
@@ -90,7 +90,6 @@ const allowedOrigins: string[] = config.allowedOrigins
 
 function isOriginAllowed(origin: string | undefined): boolean {
   if (!origin) return false;
-  if (allowedOrigins.length === 0) return true; // no restriction
   try {
     const originUrl = new URL(origin);
     return allowedOrigins.some((a) => {
@@ -109,31 +108,46 @@ function isOriginAllowed(origin: string | undefined): boolean {
   }
 }
 
+/**
+ * IPs are never written to logs in plaintext — only a short hash is kept so
+ * operators can still correlate connection events for abuse handling.
+ */
+function maskIp(ip: string): string {
+  let hash = 0;
+  for (let i = 0; i < ip.length; i++) {
+    hash = (hash * 31 + ip.charCodeAt(i)) | 0;
+  }
+  return (hash >>> 0).toString(36).padStart(7, '0');
+}
+
 // ── WebSocket server ─────────────────────────────────────────────
 
 const wss = new WebSocket.Server({
   server,
-  maxPayload: config.maxMessageSizeBytes,
+  // Sized to carry an encrypted, base64-encoded file up to
+  // MAX_FILE_SIZE_BYTES in a single frame (see config.wsMaxPayloadBytes).
+  maxPayload: wsMaxPayloadBytes,
   verifyClient: (info: { origin?: string; req: IncomingMessage }, callback: (res: boolean) => void): void => {
     const ip = info.req.socket.remoteAddress || 'unknown';
+    const masked = maskIp(ip);
 
     logger.info('WS verifyClient', {
       origin: info.origin,
-      ip,
+      ipHash: masked,
       path: info.req.url,
-      allowedOrigins: allowedOrigins.length ? allowedOrigins : '(all)',
+      allowedOrigins,
     });
 
     // Origin check
     if (!isOriginAllowed(info.origin)) {
-      logger.warn('WS rejected: origin not allowed', { origin: info.origin, ip });
+      logger.warn('WS rejected: origin not allowed', { origin: info.origin, ipHash: masked });
       callback(false);
       return;
     }
 
     // Rate limit check
     if (!checkRateLimit(ip)) {
-      logger.warn('WS rejected: rate limit exceeded', { ip });
+      logger.warn('WS rejected: rate limit exceeded', { ipHash: masked });
       callback(false);
       return;
     }
@@ -141,7 +155,7 @@ const wss = new WebSocket.Server({
     // Connection limit per IP (tracked via connectionCounts)
     const current = connectionCounts.get(ip) || 0;
     if (current >= config.rateLimitMaxConnectionsPerIp) {
-      logger.warn('WS rejected: too many connections', { ip, current });
+      logger.warn('WS rejected: too many connections', { ipHash: masked, current });
       callback(false);
       return;
     }
@@ -167,7 +181,7 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
   const ip = req.socket.remoteAddress || 'unknown';
   connectionCounts.set(ip, (connectionCounts.get(ip) || 0) + 1);
 
-  logger.info('WS client connected', { ip });
+  logger.info('WS client connected', { ipHash: maskIp(ip) });
   webSocketHandler.handleConnection(ws, ip);
 
   ws.on('close', () => {
@@ -177,7 +191,7 @@ wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     } else {
       connectionCounts.set(ip, count - 1);
     }
-    logger.info('WS client disconnected', { ip });
+    logger.info('WS client disconnected', { ipHash: maskIp(ip) });
   });
 });
 

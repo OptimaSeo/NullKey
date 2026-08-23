@@ -8,7 +8,6 @@
  */
 
 import * as x25519 from '@stablelib/x25519';
-import * as random from '@stablelib/random';
 
 /**
  * Generate a new X25519 key pair for E2EE

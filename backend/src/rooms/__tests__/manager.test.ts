@@ -69,12 +69,43 @@ describe('RoomManager', () => {
     });
   });
 
+  describe('bindInviteToken', () => {
+    it('binds an unused token to a fingerprint', () => {
+      manager.addRoom('room-1', 'token-abc');
+      expect(manager.bindInviteToken('room-1', 'token-abc', 'fp-a')).toBe(true);
+    });
+
+    it('accepts the bound fingerprint but rejects others', () => {
+      manager.addRoom('room-1', 'token-abc');
+      manager.bindInviteToken('room-1', 'token-abc', 'fp-a');
+      expect(manager.verifyInviteToken('room-1', 'token-abc', 'fp-a')).toBe(true);
+      expect(manager.verifyInviteToken('room-1', 'token-abc')).toBe(false);
+      expect(manager.verifyInviteToken('room-1', 'token-abc', 'fp-b')).toBe(false);
+    });
+
+    it('never re-binds a token to a different fingerprint', () => {
+      manager.addRoom('room-1', 'token-abc');
+      expect(manager.bindInviteToken('room-1', 'token-abc', 'fp-a')).toBe(true);
+      expect(manager.bindInviteToken('room-1', 'token-abc', 'fp-b')).toBe(false);
+    });
+
+    it('returns false for an unknown token or room', () => {
+      manager.addRoom('room-1');
+      expect(manager.bindInviteToken('room-1', 'ghost-token', 'fp-a')).toBe(false);
+      expect(manager.bindInviteToken('ghost', 'token', 'fp-a')).toBe(false);
+    });
+  });
+
   describe('addInviteToken', () => {
     it('adds additional tokens to an existing room', () => {
       manager.addRoom('room-1', 'token-1');
-      manager.addInviteToken('room-1', 'token-2');
+      expect(manager.addInviteToken('room-1', 'token-2')).toBe(true);
       expect(manager.verifyInviteToken('room-1', 'token-1')).toBe(true);
       expect(manager.verifyInviteToken('room-1', 'token-2')).toBe(true);
+    });
+
+    it('rejects tokens for non-existent rooms', () => {
+      expect(manager.addInviteToken('ghost', 'token-x')).toBe(false);
     });
   });
 
@@ -152,6 +183,23 @@ describe('RoomManager', () => {
       // that both rooms are definitely expired.
       // But we can't easily control RoomModel.isExpired because it reads config at module time.
       // Let's use a longer advance for safety.
+    });
+
+    it('notifies clients and closes their sockets before removing the room', () => {
+      manager.addRoom('room-a');
+      const client = makeClient('ws-1');
+      manager.addClientToRoom('room-a', client);
+
+      // Expire the room
+      jest.setSystemTime(1000 + 600000 + 1);
+
+      manager.cleanupExpiredRooms();
+
+      expect(client.ws.send).toHaveBeenCalledWith(
+        JSON.stringify({ event: 'room:closed', payload: { reason: 'expired' } }),
+      );
+      expect(client.ws.close).toHaveBeenCalledWith(4001, 'Room expired');
+      expect(manager.hasRoom('room-a')).toBe(false);
     });
   });
 

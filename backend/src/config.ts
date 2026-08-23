@@ -30,8 +30,10 @@ export const config = {
   port: readInt('PORT', 8080),
   nodeEnv: process.env.NODE_ENV || 'development',
 
-  // Allowed origins for WebSocket connections (comma-separated, empty = all)
-  allowedOrigins: process.env.ALLOWED_ORIGINS || '',
+  // Allowed origins for WebSocket connections (comma-separated).
+  // Defaults to local development origins; production deployments MUST set
+  // this to the origin(s) browsers use to reach the app.
+  allowedOrigins: process.env.ALLOWED_ORIGINS?.trim() || 'http://localhost:3000',
 
   // Rate limiting
   rateLimitWindowMs: readInt('RATE_LIMIT_WINDOW_MS', 900000),
@@ -46,7 +48,6 @@ export const config = {
   // Message
   messageTtlMinutes: readInt('MESSAGE_TTL_MINUTES', 5),
   maxMessageSizeBytes: readInt('MAX_MESSAGE_SIZE_BYTES', 1048576),
-
   // Cleanup
   cleanupIntervalMs: readInt('CLEANUP_INTERVAL_MS', 60000),
 
@@ -66,4 +67,13 @@ export const config = {
   // Abusive client disconnect
   disconnectOnRepeatedViolations: readBool('DISCONNECT_ON_REPEATED_VIOLATIONS', true),
   maxViolationsBeforeDisconnect: readInt('MAX_VIOLATIONS_BEFORE_DISCONNECT', 10),
-} as const;
+};
+
+// A file message carries base64(file bytes + GCM tag) inside a single JSON
+// WebSocket frame, so the frame budget must grow with the file limit
+// (100 MB file ≈ 133 MB encoded). Text-only messages remain bounded by
+// maxMessageSizeBytes; the WS layer simply accepts whichever is larger.
+export const wsMaxPayloadBytes = Math.max(
+  config.maxMessageSizeBytes,
+  Math.ceil(((config.maxFileSizeBytes + 16) * 4) / 3) + 8192,
+);

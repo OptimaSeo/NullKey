@@ -110,7 +110,6 @@ export function useChat(
     let firstSent = false;
     for (const peer of recipients) {
       try {
-        const fileHash = await crypto.computeFileHash(selectedFile.data);
         const { ciphertext, nonce } = await crypto.encryptMessage(selectedFile.data, peer.fingerprint, salt);
         socket.sendMessage({
           room_id: activeRoomId,
@@ -120,10 +119,7 @@ export function useChat(
           nonce: toHex(nonce),
           timestamp: Date.now(),
           message_type: 'file',
-          file_name: selectedFile.file.name,
           file_size: selectedFile.file.size,
-          file_type: selectedFile.file.type || 'application/octet-stream',
-          file_hash: fileHash,
         });
         firstSent = true;
       } catch {
@@ -137,6 +133,7 @@ export function useChat(
         fingerprint: crypto.fingerprint,
         username: username || 'me',
         plaintext: JSON.stringify({
+          message_type: 'file',
           file_name: selectedFile.file.name,
           file_size: selectedFile.file.size,
           file_type: selectedFile.file.type || 'application/octet-stream',
@@ -175,12 +172,10 @@ export function useChat(
         fingerprint: payload.sender_fingerprint,
         username: payload.sender_username || 'Anonymous',
         plaintext: JSON.stringify({
+          message_type: 'file',
           ciphertext: payload.ciphertext,
           nonce: payload.nonce,
-          file_name: payload.file_name || 'unnamed',
           file_size: payload.file_size || 0,
-          file_type: payload.file_type || 'application/octet-stream',
-          file_hash: payload.file_hash || '',
         }),
         timestamp: payload.timestamp || Date.now(),
         mine: false,

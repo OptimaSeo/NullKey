@@ -19,6 +19,7 @@ import {
   validateRoomJoin,
   validateKeyExchange,
   validateMessage,
+  validateInviteCreation,
 } from './validation';
 
 export interface ClientConnection {
@@ -149,6 +150,9 @@ export class WebSocketHandler {
       case 'room:leave':
         this.handleRoomLeave(client);
         break;
+      case 'invite:create':
+        this.handleInviteCreate(client, message.payload);
+        break;
       default:
         this.sendError(client.ws, 'Unknown event type', client);
     }
@@ -170,7 +174,13 @@ export class WebSocketHandler {
       this.roomManager.addClientToRoom(room_id, client);
       this.sendSuccess(client.ws, 'Room created successfully');
     } else {
-      // Room already exists — creator is reconnecting, add them back
+      // Room already exists — only holders of a valid token may rejoin.
+      // The token must be unused or bound to the presenter's fingerprint,
+      // so knowing just the room_id is not enough to get in.
+      if (!this.roomManager.verifyInviteToken(room_id, invite_token, client.fingerprint)) {
+        this.sendError(client.ws, 'Invalid or expired invite token', client);
+        return;
+      }
       if (this.roomManager.addClientToRoom(room_id, client)) {
         client.roomId = room_id;
         this.sendSuccess(client.ws, 'Rejoined existing room');
@@ -200,7 +210,7 @@ export class WebSocketHandler {
       return;
     }
 
-    if (!this.roomManager.verifyInviteToken(room_id, invite_token)) {
+    if (!this.roomManager.verifyInviteToken(room_id, invite_token, sender_fingerprint)) {
       this.sendError(client.ws, 'Invalid or expired invite token', client);
       return;
     }
@@ -212,7 +222,9 @@ export class WebSocketHandler {
 
     if (this.roomManager.addClientToRoom(room_id, client)) {
       client.roomId = room_id;
-      this.roomManager.invalidateToken(room_id, invite_token);
+      // Bind an unused token to this identity (its one-time use).
+      // Tokens already bound to this same fingerprint (reconnect) are kept.
+      this.roomManager.bindInviteToken(room_id, invite_token, sender_fingerprint);
       this.sendSuccess(client.ws, 'Joined room successfully');
 
       this.roomManager.broadcastToRoom(
@@ -271,6 +283,17 @@ export class WebSocketHandler {
       return;
     }
 
+    // Optional per-recipient routing: when present, the message is only
+    // delivered to that fingerprint instead of being broadcast to the room.
+    const recipient_fingerprint =
+      typeof payload.recipient_fingerprint === 'string' && payload.recipient_fingerprint.length > 0
+        ? payload.recipient_fingerprint
+        : undefined;
+    if (payload.recipient_fingerprint !== undefined && !recipient_fingerprint) {
+      this.sendError(client.ws, 'Invalid recipient_fingerprint', client);
+      return;
+    }
+
     // Per-fingerprint message rate limiting
     if (!this.checkMessageRateLimit(client.fingerprint)) {
       this.sendError(client.ws, 'Rate limit exceeded. Please slow down.', client);
@@ -299,26 +322,54 @@ export class WebSocketHandler {
       }
     }
 
-    this.messageForwarder.forwardMessage(
-      client.roomId,
-      {
-        event: 'message:receive',
-        payload: {
-          room_id,
-          sender_fingerprint,
-          sender_username,
-          ciphertext,
-          nonce,
-          timestamp,
-          message_type,
-          file_name: payload.file_name,
-          file_size: payload.file_size,
-          file_type: payload.file_type,
-          file_hash: payload.file_hash,
-        },
+    const outgoing = {
+      event: 'message:receive',
+      payload: {
+        room_id,
+        sender_fingerprint,
+        sender_username,
+        ciphertext,
+        nonce,
+        timestamp,
+        message_type,
+        recipient_fingerprint,
+        // File name/type/hash travel INSIDE the encrypted envelope — the
+        // relay never sees them. file_size is inherently visible via
+        // ciphertext length and stays for validation/UI.
+        file_size: payload.file_size,
       },
-      client.ws,
-    );
+    };
+
+    if (recipient_fingerprint) {
+      this.messageForwarder.forwardMessageToClient(client.roomId, outgoing, recipient_fingerprint);
+    } else {
+      this.messageForwarder.forwardMessage(client.roomId, outgoing, client.ws);
+    }
+  }
+
+  /**
+   * Register a new one-time invite token for a room the sender is in.
+   * Used by the "invite" flow to mint additional invite links after the
+   * original token has been consumed.
+   */
+  private handleInviteCreate(client: ClientConnection, payload: any): void {
+    if (!validateInviteCreation(payload)) {
+      this.sendError(client.ws, 'Missing or invalid fields for invite creation', client);
+      return;
+    }
+
+    const { room_id, invite_token } = payload;
+
+    if (!client.roomId || client.roomId !== room_id) {
+      this.sendError(client.ws, 'Not in this room', client);
+      return;
+    }
+
+    if (this.roomManager.addInviteToken(room_id, invite_token)) {
+      this.sendSuccess(client.ws, 'Invite token registered');
+    } else {
+      this.sendError(client.ws, 'Failed to register invite token', client);
+    }
   }
 
   private handleTypingEvent(client: ClientConnection, event: 'typing:start' | 'typing:stop'): void {

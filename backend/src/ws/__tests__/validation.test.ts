@@ -14,10 +14,12 @@ import {
   validateRoomJoin,
   validateKeyExchange,
   validateMessage,
+  validateInviteCreation,
 } from '../validation';
 
 jest.mock('../../config', () => ({
   config: { maxMessageSizeBytes: 1000 },
+  wsMaxPayloadBytes: 1000,
 }));
 
 describe('validateMessageFormat', () => {
@@ -129,5 +131,39 @@ describe('validateMessage', () => {
     expect(validateMessage({ ...base, ciphertext: undefined })).toBe(false);
     expect(validateMessage({ ...base, nonce: undefined })).toBe(false);
     expect(validateMessage({ ...base, timestamp: 'not-number' })).toBe(false);
+  });
+
+  it('accepts a valid hex-64 recipient_fingerprint', () => {
+    const base = { room_id: 'r', sender_fingerprint: 'fp', ciphertext: 'ct', nonce: 'n', timestamp: 1000 };
+    const fp = 'a'.repeat(64);
+    expect(validateMessage({ ...base, recipient_fingerprint: fp })).toBe(true);
+    expect(validateMessage({ ...base, recipient_fingerprint: undefined })).toBe(true);
+  });
+
+  it('rejects malformed recipient_fingerprint', () => {
+    const base = { room_id: 'r', sender_fingerprint: 'fp', ciphertext: 'ct', nonce: 'n', timestamp: 1000 };
+    expect(validateMessage({ ...base, recipient_fingerprint: 'nothex' })).toBe(false);
+    expect(validateMessage({ ...base, recipient_fingerprint: `${'g'.repeat(64)}` })).toBe(false);
+    expect(validateMessage({ ...base, recipient_fingerprint: `${'a'.repeat(63)}` })).toBe(false);
+    expect(validateMessage({ ...base, recipient_fingerprint: 12345 })).toBe(false);
+  });
+});
+
+describe('validateInviteCreation', () => {
+  const token = 'a'.repeat(64);
+
+  it('accepts a valid payload', () => {
+    expect(validateInviteCreation({ room_id: 'r', invite_token: token })).toBe(true);
+  });
+
+  it('rejects missing fields', () => {
+    expect(validateInviteCreation({ invite_token: token })).toBe(false);
+    expect(validateInviteCreation({ room_id: 'r' })).toBe(false);
+  });
+
+  it('rejects malformed tokens', () => {
+    expect(validateInviteCreation({ room_id: 'r', invite_token: 'short-token' })).toBe(false);
+    expect(validateInviteCreation({ room_id: 'r', invite_token: `${'g'.repeat(64)}` })).toBe(false);
+    expect(validateInviteCreation({ room_id: 'r', invite_token: null })).toBe(false);
   });
 });

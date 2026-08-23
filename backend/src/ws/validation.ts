@@ -8,9 +8,11 @@
  */
 
 import WebSocket from 'ws';
-import { config } from '../config';
+import { wsMaxPayloadBytes } from '../config';
 
 // Validation functions for incoming WebSocket messages
+
+const HEX_64_RE = /^[0-9a-fA-F]{64}$/;
 export function validateMessageFormat(data: WebSocket.Data): boolean {
   try {
     const message = JSON.parse(data.toString());
@@ -42,7 +44,7 @@ export function validatePayloadSize(payload: any): boolean {
   if (!payload || typeof payload !== 'object') return true;
   // Rough estimate via JSON stringify length
   const size = Buffer.byteLength(JSON.stringify(payload), 'utf-8');
-  return size <= config.maxMessageSizeBytes;
+  return size <= wsMaxPayloadBytes;
 }
 
 export function validateRoomCreation(payload: any): boolean {
@@ -121,6 +123,31 @@ export function validateMessage(payload: any): boolean {
   if (!payload.timestamp || typeof payload.timestamp !== 'number') {
     return false;
   }
+
+  // Optional targeted-delivery field: when present it must be a hex-64
+  // fingerprint (sha256 of the recipient's public key).
+  if (
+    payload.recipient_fingerprint !== undefined &&
+    !(typeof payload.recipient_fingerprint === 'string' && HEX_64_RE.test(payload.recipient_fingerprint))
+  ) {
+    return false;
+  }
   
+  return true;
+}
+
+export function validateInviteCreation(payload: any): boolean {
+  if (!payload || typeof payload !== 'object') {
+    return false;
+  }
+
+  if (!payload.room_id || typeof payload.room_id !== 'string') {
+    return false;
+  }
+
+  if (!payload.invite_token || !HEX_64_RE.test(payload.invite_token)) {
+    return false;
+  }
+
   return true;
 }

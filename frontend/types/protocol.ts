@@ -15,7 +15,8 @@ export type ServerEvent =
   | 'client:joined'
   | 'client:left'
   | 'typing:start'
-  | 'typing:stop';
+  | 'typing:stop'
+  | 'room:closed';
 
 export type ConnectionStatus = 'open' | 'close' | 'error';
 
@@ -48,10 +49,8 @@ export interface MessagePayload {
   nonce: string;
   timestamp: number;
   message_type?: 'text' | 'file';
-  file_name?: string;
+  recipient_fingerprint?: string;
   file_size?: number;
-  file_type?: string;
-  file_hash?: string;
 }
 
 export interface KeyExchangePayload {

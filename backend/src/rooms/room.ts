@@ -70,8 +70,16 @@ export class RoomModel {
     this.lastActivity = Date.now();
   }
 
-  isExpired(maxIdleTime?: number): boolean {
+  /**
+   * A room expires when EITHER the idle timeout is exceeded since the last
+   * activity OR its absolute lifetime (since creation) is exhausted.
+   */
+  isExpired(maxIdleTime?: number, maxLifetime?: number): boolean {
     const idle = maxIdleTime ?? config.roomIdleTimeoutMinutes * 60 * 1000;
+    const lifetime = maxLifetime ?? config.maxRoomLifetimeMinutes * 60 * 1000;
+    if (Date.now() - this.createdAt > lifetime) {
+      return true;
+    }
     return Date.now() - this.lastActivity > idle;
   }
 }

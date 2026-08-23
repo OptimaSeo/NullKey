@@ -12,7 +12,8 @@ import { ClientConnection } from '../ws/handler';
 
 export class RoomManager {
   private rooms: Map<string, RoomModel>;
-  private inviteTokens: Map<string, Set<string>>; // roomId → Set<one-time token>
+  // roomId → (token → bound fingerprint; '' means still unused)
+  private inviteTokens: Map<string, Map<string, string>>;
 
   constructor() {
     this.rooms = new Map();
@@ -33,7 +34,7 @@ export class RoomManager {
     const room = new RoomModel(roomId);
     this.rooms.set(roomId, room);
     if (inviteToken) {
-      this.inviteTokens.set(roomId, new Set([inviteToken]));
+      this.inviteTokens.set(roomId, new Map([[inviteToken, '']]));
     }
     return true;
   }
@@ -80,7 +81,9 @@ export class RoomManager {
   }
 
   /**
-   * Broadcast a message to all clients in a room except the sender
+   * Broadcast a message to all clients in a room except the sender.
+   * Also refreshes the room's lastActivity so actively-used rooms are
+   * not reaped by the idle cleanup while a conversation is in progress.
    * @param roomId The room to broadcast to
    * @param message The message to broadcast
    * @param senderWs The WebSocket of the sender to exclude
@@ -91,6 +94,7 @@ export class RoomManager {
       return;
     }
 
+    room.updateLastActivity();
     const messageStr = JSON.stringify(message);
     room.clients.forEach(client => {
       if (!senderWs || client.ws !== senderWs) {
@@ -120,20 +124,40 @@ export class RoomManager {
   }
 
   /**
-   * Verify an invite token for a room
+   * Verify an invite token for a room.
+   * A token is valid if it is still unused ('') or already bound to the
+   * same fingerprint that is presenting it (reconnect of the same identity).
    * @param roomId The room to verify against
-   * @param token The invite token to check
-   * @returns True if the token is valid for this room
+   * @param token The token to check
+   * @param fingerprint The fingerprint claiming the token (optional)
+   * @returns True if the token is usable by this fingerprint
    */
-  verifyInviteToken(roomId: string, token: string): boolean {
+  verifyInviteToken(roomId: string, token: string, fingerprint?: string): boolean {
     const tokens = this.inviteTokens.get(roomId);
-    return tokens?.has(token) ?? false;
+    if (!tokens || !tokens.has(token)) return false;
+    const bound = tokens.get(token)!;
+    return bound === '' || bound === fingerprint;
   }
 
   /**
-   * Invalidate (consume) a one-time invite token
+   * Bind an unused invite token to a fingerprint (consume its one-time use).
+   * Tokens already bound keep their original owner; they can never be
+   * re-bound to a different fingerprint.
    * @param roomId The room the token belongs to
-   * @param token The token to invalidate
+   * @param token The token to bind
+   * @param fingerprint The fingerprint taking ownership of the token
+   * @returns True if this call performed the binding (token was unused)
+   */
+  bindInviteToken(roomId: string, token: string, fingerprint?: string): boolean {
+    const tokens = this.inviteTokens.get(roomId);
+    if (!tokens || !tokens.has(token)) return false;
+    if (tokens.get(token) !== '') return false;
+    tokens.set(token, fingerprint ?? '');
+    return true;
+  }
+
+  /**
+   * Invalidate (remove) an invite token entirely.
    */
   invalidateToken(roomId: string, token: string): void {
     const tokens = this.inviteTokens.get(roomId);
@@ -146,19 +170,31 @@ export class RoomManager {
   }
 
   /**
-   * Add an invite token to an existing room (for reconnect or additional invites)
+   * Add an unused invite token to an existing room
+   * (e.g. registered via `invite:create` by a room member).
    * @param roomId The room to add the token to
-   * @param token The invite token to add
+   * @param token The token to add
+   * @returns True if the token was added, false if the room does not exist
    */
-  addInviteToken(roomId: string, token: string): void {
-    if (!this.inviteTokens.has(roomId)) {
-      this.inviteTokens.set(roomId, new Set());
+  addInviteToken(roomId: string, token: string): boolean {
+    if (!this.rooms.has(roomId)) {
+      return false;
     }
-    this.inviteTokens.get(roomId)!.add(token);
+    let tokens = this.inviteTokens.get(roomId);
+    if (!tokens) {
+      tokens = new Map();
+      this.inviteTokens.set(roomId, tokens);
+    }
+    if (tokens.has(token)) {
+      return false;
+    }
+    tokens.set(token, '');
+    return true;
   }
 
   /**
-   * Clean up expired rooms
+   * Clean up expired rooms. Connected clients are notified with a
+   * `room:closed` event and their sockets are closed before removal.
    */
   cleanupExpiredRooms(): void {
     const expiredRooms: string[] = [];
@@ -170,6 +206,20 @@ export class RoomManager {
     });
 
     expiredRooms.forEach(roomId => {
+      const room = this.rooms.get(roomId);
+      if (room) {
+        const messageStr = JSON.stringify({ event: 'room:closed', payload: { reason: 'expired' } });
+        room.clients.forEach(client => {
+          try {
+            if (client.ws.readyState === client.ws.OPEN) {
+              client.ws.send(messageStr);
+              client.ws.close(4001, 'Room expired');
+            }
+          } catch {
+            // socket may already be closing — nothing to do
+          }
+        });
+      }
       this.rooms.delete(roomId);
       this.inviteTokens.delete(roomId);
     });

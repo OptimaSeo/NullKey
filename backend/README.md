@@ -49,8 +49,8 @@ All configuration is via environment variables (see root [`.env.example`](../.en
 | `MAX_ROOM_LIFETIME_MINUTES` | `60` | Absolute room TTL |
 | `ROOM_IDLE_TIMEOUT_MINUTES` | `10` | Room auto-deletes after this long with no activity |
 | `MESSAGE_TTL_MINUTES` | `5` | Replay protection window |
-| `MAX_MESSAGE_SIZE_BYTES` | `1048576` (1 MB) | Max WebSocket frame payload |
-| `MAX_FILE_SIZE_BYTES` | `104857600` (100 MB) | Max file size for file messages |
+| `MAX_MESSAGE_SIZE_BYTES` | `1048576` (1 MB) | Max payload for non-file messages |
+| `MAX_FILE_SIZE_BYTES` | `104857600` (100 MB) | Max file size for file messages (drives the WS frame budget: base64(file+tag) must fit in one frame) |
 | `REPLAY_PROTECTION_ENABLED` | `true` | Enable/disable nonce replay check |
 | `SECURITY_HEADERS_ENABLED` | `true` | Enable HTTP security headers (CSP, X-Frame-Options, etc.) |
 | `DISCONNECT_ON_REPEATED_VIOLATIONS` | `true` | Auto-disconnect clients with repeated protocol errors |
@@ -93,7 +93,9 @@ All messages are JSON `{ "event": "string", "payload": object }`.
 | `message:receive` | Server → Client | Receive encrypted message from peer |
 | `typing:start` / `typing:stop` | Both | Typing indicator relay |
 | `room:leave` | Client → Server | Leave current room |
+| `invite:create` | Client → Server | Register a new one-time invite token for the room the sender is in |
 | `client:joined` / `client:left` | Server → Client | Room membership notifications |
+| `room:closed` | Server → Client | Room expired and was removed; sockets are closed (code 4001) |
 
 See [`docs/protocol.md`](../docs/protocol.md) for full protocol specification.
 
@@ -102,8 +104,10 @@ See [`docs/protocol.md`](../docs/protocol.md) for full protocol specification.
 | Endpoint | Method | Purpose |
 |---|---|---|
 | `/health` | GET | Health check – returns `{ status, timestamp, roomsActive }` |
-| `/rooms` | GET | List all active room IDs (debug) |
-| `/rooms/:roomId` | GET | Room info (debug) |
+
+Note: the previous `/rooms` and `/rooms/:roomId` debug endpoints were removed —
+they publicly exposed active room IDs, which combined with `room:create`
+rejoining would have allowed anyone to enter any room.
 
 ## Docker
 
@@ -111,9 +115,9 @@ See [`docs/protocol.md`](../docs/protocol.md) for full protocol specification.
 # Build image
 docker build -t nullkey-backend .
 
-# Run
-docker run -d -p 8080:8080 \
-  -e ALLOWED_ORIGINS=http://localhost:3000 \
+# Run (the image listens on PORT=2020 by default)
+docker run -d -p 2020:2020 \
+  -e ALLOWED_ORIGINS=http://localhost:1010 \
   --name nullkey-backend \
   nullkey-backend
 ```

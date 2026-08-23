@@ -72,6 +72,7 @@ export default function QRCodeModal({ inviteLink, roomSecret, creatorFingerprint
 
           <div className="flex justify-center mb-6">
             {qrDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- data: URL, images are unoptimized
               <img src={qrDataUrl} alt="QR Code" className="border border-dark-green" width={200} height={200} />
             ) : (
               <div className="w-[200px] h-[200px] border border-dark-green flex items-center justify-center text-gray-600 text-xs">

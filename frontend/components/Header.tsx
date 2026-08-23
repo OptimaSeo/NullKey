@@ -7,6 +7,8 @@
  * the Free Software Foundation, version 3.
  */
 
+import Link from 'next/link';
+
 export default function Header() {
   return (
     <header className="text-center mb-10">
@@ -41,8 +43,8 @@ export default function Header() {
 
       {/* Navigation */}
       <nav className="flex justify-center gap-8 mt-6 text-xs uppercase tracking-[0.2em]">
-        <a href="/" className="text-gray-500 hover:text-neon-green transition">Home</a>
-        <a href="/license" className="text-gray-500 hover:text-neon-green transition">License</a>
+        <Link href="/" className="text-gray-500 hover:text-neon-green transition">Home</Link>
+        <Link href="/license" className="text-gray-500 hover:text-neon-green transition">License</Link>
       </nav>
     </header>
   );
